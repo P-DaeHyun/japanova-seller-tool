@@ -1,0 +1,52 @@
+name: Update JAPANOVA FX
+
+on:
+  schedule:
+    - cron: '15 0 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-fx:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Fetch latest FX and write fx.json
+        shell: python
+        run: |
+          import json, urllib.request, datetime
+          url = 'https://api.frankfurter.app/latest?from=JPY&to=TWD,SGD,MYR,THB,PHP,VND'
+          with urllib.request.urlopen(url, timeout=30) as response:
+              payload = json.load(response)
+          rates = payload.get('rates', {})
+          required = ['TWD','SGD','MYR','THB','PHP','VND']
+          missing = [c for c in required if not rates.get(c)]
+          if missing:
+              raise RuntimeError('Missing FX currencies: ' + ','.join(missing))
+          now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9)))
+          out = {
+              'fxVersion': now.strftime('%Y.%m.%d'),
+              'updatedAt': now.isoformat(timespec='seconds'),
+              'source': 'Frankfurter API via GitHub Actions',
+              'sourceDate': payload.get('date'),
+              'jpyPer': {c: 1 / float(rates[c]) for c in required}
+          }
+          with open('fx.json', 'w', encoding='utf-8') as f:
+              json.dump(out, f, ensure_ascii=False, indent=2)
+              f.write('\n')
+
+      - name: Commit FX snapshot when changed
+        run: |
+          if git diff --quiet -- fx.json; then
+            echo "No FX change"
+            exit 0
+          fi
+          git config user.name "japanova-fx-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add fx.json
+          git commit -m "Auto-update FX rates"
+          git push
