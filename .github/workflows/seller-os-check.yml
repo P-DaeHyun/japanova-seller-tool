@@ -54,6 +54,7 @@ jobs:
           node --check ../candidate-lab.js
           node --check ../candidate-lab-v10.js
           node --check ../competitor-research.js
+          node --check ../listing-prep.js
 
       - name: Check preview inline JavaScript syntax
         shell: bash
@@ -89,3 +90,9 @@ jobs:
           grep -q 'competitor-research.js' ../v11.html
           grep -q '경쟁상품 조사센터' ../v11.html
           grep -q '대표 경쟁가' ../v11.html
+          test -f ../v12.html
+          grep -q 'listing-prep.js' ../v12.html
+          grep -q 'Shopee 등록 준비센터' ../v12.html
+          grep -q '실제 add_item은 아직 잠금' ../v12.html
+          grep -q "get_attribute_tree" src/routes/candidates.js
+          grep -q "get_channel_list" src/routes/candidates.js
