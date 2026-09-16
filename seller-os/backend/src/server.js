@@ -65,7 +65,7 @@ app.get('/api/health', async (_req, res) => {
   }
   res.json({
     service: 'JAPANOVA Seller OS Backend',
-    version: '0.2.0',
+    version: '0.4.0',
     status: '정상',
     database: db,
     shopeeEnvironment: process.env.SHOPEE_ENV || 'sandbox',
@@ -366,7 +366,45 @@ app.put('/api/products/cost/:sku', async (req, res) => {
         b.supplier || null, b.note || null
       ]
     );
-    res.json({ message: '상품 원가를 저장했습니다.', cost: result.rows[0] });
+
+    const affected = await query(
+      `select distinct oi.order_sn
+       from order_items oi
+       join settlements s on s.order_sn=oi.order_sn
+       where oi.item_sku=$1
+       order by oi.order_sn`,
+      [sku]
+    );
+    const recalculated = [];
+    for (const row of affected.rows) {
+      try {
+        const profit = await calculateProfit(String(row.order_sn));
+        recalculated.push({
+          orderSn: row.order_sn,
+          ok: true,
+          costComplete: profit.missingCostSkus.length === 0,
+          missingCostSkus: profit.missingCostSkus
+        });
+      } catch (error) {
+        recalculated.push({ orderSn: row.order_sn, ok: false, message: error.message });
+      }
+    }
+    const complete = recalculated.filter((x) => x.ok && x.costComplete).length;
+    const pending = recalculated.filter((x) => x.ok && !x.costComplete).length;
+    const errors = recalculated.filter((x) => !x.ok).length;
+
+    res.json({
+      message: '상품 원가를 저장하고 관련 주문 수익을 다시 계산했습니다.',
+      cost: result.rows[0],
+      recalculation: {
+        affectedOrders: affected.rowCount,
+        recalculated: recalculated.length,
+        complete,
+        pending,
+        errors,
+        orders: recalculated
+      }
+    });
   } catch (error) {
     res.status(500).json(safeError(error));
   }
@@ -432,7 +470,14 @@ app.get('/api/profits', async (req, res) => {
   const sqlWhere = where.length ? `where ${where.join(' and ')}` : '';
   try {
     const result = await query(
-      `select ps.*, o.market_code, o.currency, o.order_status, o.created_time_shopee
+      `select ps.*, o.market_code, o.currency, o.order_status, o.created_time_shopee,
+              not exists (
+                select 1
+                from order_items oi
+                left join product_costs pc on pc.item_sku=oi.item_sku
+                where oi.order_sn=ps.order_sn
+                  and (oi.item_sku is null or pc.purchase_cost_jpy is null)
+              ) as cost_complete
        from profit_snapshots ps join orders o on o.order_sn=ps.order_sn
        ${sqlWhere}
        order by ps.calculated_at desc limit 1000`,
@@ -451,8 +496,16 @@ app.get('/api/dashboard', async (_req, res) => {
       query(`select count(*)::int as n from shopee_connections where status='CONNECTED'`),
       query(`select count(*)::int as orders, coalesce(sum(total_amount*fx_jpy_per),0)::numeric as sales_jpy
              from orders where created_time_shopee >= date_trunc('day',now())`),
-      query(`select coalesce(sum(actual_profit_jpy),0)::numeric as profit_jpy
-             from profit_snapshots where calculated_at >= now()-interval '30 days'`),
+      query(`select coalesce(sum(ps.actual_profit_jpy),0)::numeric as profit_jpy
+             from profit_snapshots ps
+             where ps.calculated_at >= now()-interval '30 days'
+               and not exists (
+                 select 1
+                 from order_items oi
+                 left join product_costs pc on pc.item_sku=oi.item_sku
+                 where oi.order_sn=ps.order_sn
+                   and (oi.item_sku is null or pc.purchase_cost_jpy is null)
+               )`),
       query(`select market_code, count(*)::int as orders,
                     coalesce(sum(total_amount*fx_jpy_per),0)::numeric as sales_jpy
              from orders group by market_code order by market_code`)
