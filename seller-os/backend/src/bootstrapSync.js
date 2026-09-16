@@ -11,6 +11,7 @@ import {
   syncSettlement
 } from './services/sync.js';
 import { getInventoryList, getInventorySummary } from './services/inventory.js';
+import { listCandidates } from './services/candidates.js';
 
 const enabled = String(process.env.BOOTSTRAP_SYNC_ON_START || '').trim().toLowerCase();
 const shouldRun = ['1', 'true', 'yes', 'on'].includes(enabled);
@@ -31,11 +32,7 @@ async function issueShopScopedToken(shopId) {
   }
 
   const currentRefreshToken = decryptSecret(saved.rows[0].refresh_token_encrypted);
-  const token = await refreshAccessToken({
-    refreshToken: currentRefreshToken,
-    shopId
-  });
-
+  const token = await refreshAccessToken({ refreshToken: currentRefreshToken, shopId });
   if (!token.access_token) {
     throw new Error('Shopee가 Shop 전용 Access Token을 반환하지 않았습니다.');
   }
@@ -77,19 +74,12 @@ async function hydrateShopConnection(shopId) {
   let raw;
 
   try {
-    raw = await getShopApi(ShopeePaths.shopInfo, {
-      shopId,
-      accessToken
-    });
+    raw = await getShopApi(ShopeePaths.shopInfo, { shopId, accessToken });
   } catch (error) {
     if (!isInvalidAccessToken(error)) throw error;
-
     console.warn(`JAPANOVA 공용 토큰 감지, Shop 전용 토큰으로 전환: ${shopId}`);
     accessToken = await issueShopScopedToken(shopId);
-    raw = await getShopApi(ShopeePaths.shopInfo, {
-      shopId,
-      accessToken
-    });
+    raw = await getShopApi(ShopeePaths.shopInfo, { shopId, accessToken });
   }
 
   const info = raw?.response && typeof raw.response === 'object' ? raw.response : raw;
@@ -102,12 +92,7 @@ async function hydrateShopConnection(shopId) {
          merchant_id=coalesce($4, merchant_id),
          updated_at=now()
      where shop_id=$1`,
-    [
-      shopId,
-      marketCode,
-      info?.shop_name || null,
-      info?.merchant_id ? Number(info.merchant_id) : null
-    ]
+    [shopId, marketCode, info?.shop_name || null, info?.merchant_id ? Number(info.merchant_id) : null]
   );
 
   return {
@@ -163,7 +148,6 @@ try {
     }
   }
 
-  // 읽기 전용 self-check: 실제 재고 API가 사용하는 목록/요약 SQL을 서버 기동 전에 검증한다.
   try {
     const [inventory, summary] = await Promise.all([
       getInventoryList(),
@@ -174,6 +158,14 @@ try {
     );
   } catch (error) {
     console.warn(`JAPANOVA 재고 self-check 실패: ${error.message}`);
+    throw error;
+  }
+
+  try {
+    const candidates = await listCandidates();
+    console.log(`JAPANOVA 후보상품 self-check 완료: candidates=${candidates.length}`);
+  } catch (error) {
+    console.warn(`JAPANOVA 후보상품 self-check 실패: ${error.message}`);
     throw error;
   }
 } catch (error) {
