@@ -18,22 +18,93 @@ jobs:
       - name: Fetch latest FX and write fx.json
         shell: python
         run: |
-          import json, urllib.request, datetime
-          url = 'https://api.frankfurter.app/latest?from=JPY&to=TWD,SGD,MYR,THB,PHP,VND'
-          with urllib.request.urlopen(url, timeout=30) as response:
-              payload = json.load(response)
-          rates = payload.get('rates', {})
-          required = ['TWD','SGD','MYR','THB','PHP','VND']
-          missing = [c for c in required if not rates.get(c)]
-          if missing:
-              raise RuntimeError('Missing FX currencies: ' + ','.join(missing))
+          import json, urllib.request, datetime, time
+
+          REQUIRED = ['TWD','SGD','MYR','THB','PHP','VND']
+          HEADERS = {
+              'User-Agent': 'JAPANOVA-FX-Updater/1.0 (+https://github.com/P-DaeHyun/japanova-seller-tool)',
+              'Accept': 'application/json'
+          }
+
+          def get_json(url, attempts=3):
+              last = None
+              for i in range(attempts):
+                  try:
+                      req = urllib.request.Request(url, headers=HEADERS)
+                      with urllib.request.urlopen(req, timeout=30) as response:
+                          return json.load(response)
+                  except Exception as e:
+                      last = e
+                      print(f'Attempt {i+1}/{attempts} failed for {url}: {e}')
+                      if i + 1 < attempts:
+                          time.sleep(2 ** i)
+              raise last
+
+          def frankfurter_v2():
+              url = 'https://api.frankfurter.dev/v2/rates?base=JPY&quotes=' + ','.join(REQUIRED)
+              payload = get_json(url)
+              rates = {}
+              dates = []
+              for row in payload:
+                  quote = str(row.get('quote', '')).upper()
+                  rate = row.get('rate')
+                  if quote in REQUIRED and rate:
+                      rates[quote] = float(rate)
+                      if row.get('date'):
+                          dates.append(row['date'])
+              missing = [c for c in REQUIRED if not rates.get(c)]
+              if missing:
+                  raise RuntimeError('Frankfurter v2 missing: ' + ','.join(missing))
+              return rates, (max(dates) if dates else None), 'Frankfurter v2'
+
+          def frankfurter_v1():
+              url = 'https://api.frankfurter.dev/v1/latest?base=JPY&symbols=' + ','.join(REQUIRED)
+              payload = get_json(url)
+              rates = {c: float(payload.get('rates', {}).get(c, 0)) for c in REQUIRED}
+              missing = [c for c in REQUIRED if not rates.get(c)]
+              if missing:
+                  raise RuntimeError('Frankfurter v1 missing: ' + ','.join(missing))
+              return rates, payload.get('date'), 'Frankfurter v1 fallback'
+
+          rates = source_date = source = None
+          errors = []
+          for provider in (frankfurter_v2, frankfurter_v1):
+              try:
+                  rates, source_date, source = provider()
+                  print('FX source selected:', source)
+                  break
+              except Exception as e:
+                  errors.append(f'{provider.__name__}: {e}')
+                  print('Provider failed:', errors[-1])
+
+          if rates is None:
+              # Keep the last-known-good snapshot instead of overwriting it or failing the workflow.
+              # This prevents a temporary provider outage from breaking JAPANOVA.
+              try:
+                  with open('fx.json', 'r', encoding='utf-8') as f:
+                      old = json.load(f)
+                  old_rates = old.get('jpyPer', {})
+                  missing = [c for c in REQUIRED if not old_rates.get(c)]
+                  if missing:
+                      raise RuntimeError('Existing fx.json missing: ' + ','.join(missing))
+                  print('WARNING: all live FX providers failed; preserving last-known-good fx.json')
+                  print(' | '.join(errors))
+                  raise SystemExit(0)
+              except FileNotFoundError:
+                  raise RuntimeError('All FX providers failed and no fallback fx.json exists: ' + ' | '.join(errors))
+
+          # Sanity check: rates must be positive and finite enough for currency conversion.
+          for c, value in rates.items():
+              if not (value > 0 and value < 10000000):
+                  raise RuntimeError(f'Invalid live FX rate {c}={value}')
+
           now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9)))
           out = {
               'fxVersion': now.strftime('%Y.%m.%d'),
               'updatedAt': now.isoformat(timespec='seconds'),
-              'source': 'Frankfurter API via GitHub Actions',
-              'sourceDate': payload.get('date'),
-              'jpyPer': {c: 1 / float(rates[c]) for c in required}
+              'source': source + ' via GitHub Actions',
+              'sourceDate': source_date,
+              'jpyPer': {c: 1 / rates[c] for c in REQUIRED}
           }
           with open('fx.json', 'w', encoding='utf-8') as f:
               json.dump(out, f, ensure_ascii=False, indent=2)
