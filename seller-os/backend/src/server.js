@@ -9,6 +9,7 @@ import {
   buildAuthorizationUrl,
   exchangeAuthorizationCode,
   getShopApi,
+  postShopApi,
   ShopeePaths
 } from './services/shopee.js';
 import {
@@ -26,6 +27,7 @@ const allowedOrigins = String(process.env.ALLOWED_ORIGIN || 'http://localhost:30
   .split(',')
   .map((v) => v.trim())
   .filter(Boolean);
+const sellerOsApiKey = String(process.env.SELLER_OS_API_KEY || '').trim();
 
 app.use(cors({
   origin(origin, callback) {
@@ -53,6 +55,21 @@ function requireDb(res) {
   return false;
 }
 
+function isPublicApiPath(req) {
+  return req.path === '/health'
+    || req.path === '/shopee/callback'
+    || req.path === '/shopee/authorize'
+    || req.path === '/shopee/authorize-url';
+}
+
+// Production 전환 때 SELLER_OS_API_KEY를 설정하면 운영 API가 자동으로 잠긴다.
+// 현재 Sandbox에서는 환경변수를 비워 기존 UI와 테스트 흐름을 그대로 유지한다.
+app.use('/api', (req, res, next) => {
+  if (!sellerOsApiKey || isPublicApiPath(req)) return next();
+  if (String(req.get('x-seller-os-key') || '') === sellerOsApiKey) return next();
+  return res.status(401).json({ error: true, message: 'Seller OS API 인증이 필요합니다.' });
+});
+
 app.get('/api/health', async (_req, res) => {
   let db = '미설정';
   if (hasDb()) {
@@ -65,44 +82,44 @@ app.get('/api/health', async (_req, res) => {
   }
   res.json({
     service: 'JAPANOVA Seller OS Backend',
-    version: '0.4.1',
+    version: '0.5.0',
     status: '정상',
     database: db,
     shopeeEnvironment: process.env.SHOPEE_ENV || 'sandbox',
+    apiAuthEnabled: Boolean(sellerOsApiKey),
     markets: Object.keys(MARKETS),
     now: new Date().toISOString()
   });
 });
 
 app.get('/api/markets', async (_req, res) => {
-  let connectionMap = {};
-  if (hasDb()) {
-    const result = await query(
-      `select market_code, count(*)::int as shops,
-              max(last_sync_at) as last_sync_at
-       from shopee_connections
-       where status='CONNECTED'
-       group by market_code`
-    );
-    connectionMap = Object.fromEntries(result.rows.map((r) => [r.market_code, r]));
-  }
-
-  res.json(
-    Object.entries(MARKETS).map(([code, market]) => ({
+  try {
+    let connectionMap = {};
+    if (hasDb()) {
+      const result = await query(
+        `select market_code, count(*)::int as shops, max(last_sync_at) as last_sync_at
+         from shopee_connections
+         where status='CONNECTED'
+         group by market_code`
+      );
+      connectionMap = Object.fromEntries(result.rows.map((r) => [r.market_code, r]));
+    }
+    res.json(Object.entries(MARKETS).map(([code, market]) => ({
       code,
       ...market,
       connectionStatus: connectionMap[code] ? '연결됨' : (market.futureMarket ? '향후 입점' : '미연동'),
       connectedShops: connectionMap[code]?.shops || 0,
       lastSyncAt: connectionMap[code]?.last_sync_at || null
-    }))
-  );
+    })));
+  } catch (error) {
+    res.status(500).json(safeError(error));
+  }
 });
 
 app.get('/api/fx', async (req, res) => {
   try {
     const buffer = req.query.buffer === undefined ? undefined : Number(req.query.buffer);
-    const snapshot = await fetchFxSnapshot({ buffer });
-    res.json(snapshot);
+    res.json(await fetchFxSnapshot({ buffer }));
   } catch (error) {
     res.status(502).json(safeError(error));
   }
@@ -113,7 +130,6 @@ app.post('/api/fx/refresh', async (req, res) => {
     const snapshot = await fetchFxSnapshot({
       buffer: req.body?.buffer === undefined ? undefined : Number(req.body.buffer)
     });
-
     if (hasDb()) {
       for (const [currency, jpyPer] of Object.entries(snapshot.jpyPer)) {
         await query(
@@ -123,7 +139,6 @@ app.post('/api/fx/refresh', async (req, res) => {
         );
       }
     }
-
     res.json({ message: '환율을 새로 갱신했습니다.', ...snapshot });
   } catch (error) {
     res.status(502).json(safeError(error));
@@ -132,12 +147,11 @@ app.post('/api/fx/refresh', async (req, res) => {
 
 app.get('/api/shopee/authorize-url', (_req, res) => {
   try {
-    const url = buildAuthorizationUrl();
     res.json({
-      message: 'Shopee Sandbox 인증 URL을 생성했습니다.',
+      message: 'Shopee 인증 URL을 생성했습니다.',
       environment: process.env.SHOPEE_ENV || 'sandbox',
       redirectUri: process.env.SHOPEE_REDIRECT_URI || null,
-      url
+      url: buildAuthorizationUrl()
     });
   } catch (error) {
     res.status(500).json(safeError(error));
@@ -167,11 +181,9 @@ app.get('/api/shopee/callback', async (req, res) => {
       shopId: shopId ? Number(shopId) : undefined,
       mainAccountId: mainAccountId ? Number(mainAccountId) : undefined
     });
-
     const shopIds = token.shop_id_list?.length
       ? token.shop_id_list
       : (shopId ? [Number(shopId)] : []);
-
     const accessExpiresAt = new Date(Date.now() + Number(token.expire_in || 14400) * 1000);
     const refreshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     const connected = [];
@@ -186,7 +198,6 @@ app.get('/api/shopee/callback', async (req, res) => {
       } catch (error) {
         console.warn('Shop info lookup failed', id, error.message);
       }
-
       const region = info?.region || null;
       const marketCode = region && MARKETS[region] ? region : null;
       const shopName = info?.shop_name || null;
@@ -217,14 +228,13 @@ app.get('/api/shopee/callback', async (req, res) => {
           ]
         );
       }
-
       connected.push({
         shopId: Number(id), shopName, marketCode,
         marketNameKo: marketCode ? MARKETS[marketCode].nameKo : '미확인', merchantId
       });
     }
 
-    res.json({
+    return res.json({
       message: 'Shopee 연결 인증이 완료되었습니다.',
       connected,
       tokenStored: hasDb(),
@@ -232,7 +242,7 @@ app.get('/api/shopee/callback', async (req, res) => {
       refreshTokenExpiresAt: refreshExpiresAt.toISOString()
     });
   } catch (error) {
-    res.status(502).json(safeError(error));
+    return res.status(502).json(safeError(error));
   }
 });
 
@@ -318,6 +328,94 @@ app.post('/api/shopee/sync-all', async (req, res) => {
   }
 });
 
+// 출고 전에 Shopee가 허용하는 pickup/dropoff/non_integrated 옵션을 읽기 전용으로 조회한다.
+app.get('/api/shopee/shipping-parameter/:orderSn', async (req, res) => {
+  if (!requireDb(res)) return;
+  try {
+    const orderSn = String(req.params.orderSn);
+    const orderResult = await query(
+      `select order_sn, shop_id, market_code, order_status, shipping_carrier,
+              package_number, logistics_status
+       from orders where order_sn=$1`,
+      [orderSn]
+    );
+    if (!orderResult.rowCount) {
+      return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
+    }
+    const order = orderResult.rows[0];
+    const auth = await getValidAccessToken(Number(order.shop_id));
+    const data = await getShopApi(ShopeePaths.shippingParameter, {
+      shopId: Number(order.shop_id),
+      accessToken: auth.accessToken,
+      params: { order_sn: orderSn }
+    });
+    return res.json({
+      order: { ...order, order_status_ko: orderStatusKo(order.order_status) },
+      shippingParameter: data.response || data,
+      tokenRefreshed: auth.refreshed
+    });
+  } catch (error) {
+    return res.status(502).json(safeError(error));
+  }
+});
+
+// 실제 출고 호출. READY_TO_SHIP 주문만 허용하고 사용자가 method/payload를 명시해야 한다.
+app.post('/api/shopee/ship/:orderSn', async (req, res) => {
+  if (!requireDb(res)) return;
+  try {
+    const orderSn = String(req.params.orderSn);
+    const method = String(req.body?.method || '');
+    if (!['pickup', 'dropoff', 'non_integrated'].includes(method)) {
+      return res.status(400).json({ error: true, message: 'method는 pickup, dropoff, non_integrated 중 하나여야 합니다.' });
+    }
+    const orderResult = await query(
+      `select order_sn, shop_id, market_code, order_status from orders where order_sn=$1`,
+      [orderSn]
+    );
+    if (!orderResult.rowCount) {
+      return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
+    }
+    const order = orderResult.rows[0];
+    if (order.order_status !== 'READY_TO_SHIP') {
+      return res.status(409).json({
+        error: true,
+        message: `출고 가능한 READY_TO_SHIP 주문이 아닙니다. 현재 상태: ${orderStatusKo(order.order_status)}`
+      });
+    }
+    const methodPayload = req.body?.[method];
+    if (!methodPayload || typeof methodPayload !== 'object') {
+      return res.status(400).json({ error: true, message: `${method} 출고 파라미터가 필요합니다.` });
+    }
+    if (process.env.SHOPEE_ENV === 'production' && req.body?.confirm !== 'SHIP') {
+      return res.status(400).json({
+        error: true,
+        message: 'Production 실제 출고에는 confirm="SHIP" 확인값이 필요합니다.'
+      });
+    }
+    const auth = await getValidAccessToken(Number(order.shop_id));
+    const data = await postShopApi(ShopeePaths.shipOrder, {
+      shopId: Number(order.shop_id),
+      accessToken: auth.accessToken,
+      body: { order_sn: orderSn, [method]: methodPayload }
+    });
+    let sync = null;
+    try {
+      sync = await syncOrders(Number(order.shop_id), { days: 15 });
+    } catch (error) {
+      console.warn('출고 후 주문 재동기화 실패:', error.message);
+    }
+    return res.json({
+      message: 'Shopee 출고 요청을 전송했습니다.',
+      orderSn,
+      method,
+      response: data.response || data,
+      orderResync: sync
+    });
+  } catch (error) {
+    return res.status(502).json(safeError(error));
+  }
+});
+
 app.get('/api/products', async (req, res) => {
   if (!requireDb(res)) return;
   const params = [];
@@ -388,19 +486,15 @@ app.put('/api/products/cost/:sku', async (req, res) => {
         recalculated.push({ orderSn: row.order_sn, ok: false, message: error.message });
       }
     }
-    const complete = recalculated.filter((x) => x.ok && x.costComplete).length;
-    const pending = recalculated.filter((x) => x.ok && !x.costComplete).length;
-    const errors = recalculated.filter((x) => !x.ok).length;
-
     res.json({
       message: '상품 원가를 저장하고 관련 주문 수익을 다시 계산했습니다.',
       cost: result.rows[0],
       recalculation: {
         affectedOrders: affected.rowCount,
         recalculated: recalculated.length,
-        complete,
-        pending,
-        errors,
+        complete: recalculated.filter((x) => x.ok && x.costComplete).length,
+        pending: recalculated.filter((x) => x.ok && !x.costComplete).length,
+        errors: recalculated.filter((x) => !x.ok).length,
         orders: recalculated
       }
     });
@@ -461,7 +555,6 @@ app.get('/api/orders/:orderSn', async (req, res) => {
     const missingCostSkus = items.rows
       .filter((item) => !item.item_sku || item.purchase_cost_jpy === null || item.purchase_cost_jpy === undefined)
       .map((item) => item.item_sku || String(item.item_id));
-
     res.json({
       order: { ...order.rows[0], order_status_ko: orderStatusKo(order.rows[0].order_status) },
       items: items.rows,
