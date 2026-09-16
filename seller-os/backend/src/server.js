@@ -3,7 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import { MARKETS, orderStatusKo } from './config.js';
 import { query } from './db.js';
-import { encryptSecret, decryptSecret } from './tokenCrypto.js';
+import { encryptSecret } from './tokenCrypto.js';
 import { fetchFxSnapshot } from './services/fx.js';
 import {
   buildAuthorizationUrl,
@@ -65,7 +65,7 @@ app.get('/api/health', async (_req, res) => {
   }
   res.json({
     service: 'JAPANOVA Seller OS Backend',
-    version: '0.4.0',
+    version: '0.4.1',
     status: '정상',
     database: db,
     shopeeEnvironment: process.env.SHOPEE_ENV || 'sandbox',
@@ -152,7 +152,6 @@ app.get('/api/shopee/authorize', (_req, res) => {
   }
 });
 
-// Shopee Authorization callback. 토큰은 서버에서 교환/암호화 저장하고 브라우저에는 반환하지 않는다.
 app.get('/api/shopee/callback', async (req, res) => {
   const { code, shop_id: shopId, main_account_id: mainAccountId } = req.query;
   if (!code || (!shopId && !mainAccountId)) {
@@ -448,14 +447,28 @@ app.get('/api/orders/:orderSn', async (req, res) => {
     const orderSn = String(req.params.orderSn);
     const order = await query(`select * from orders where order_sn=$1`, [orderSn]);
     if (!order.rowCount) return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
-    const items = await query(`select * from order_items where order_sn=$1 order by id`, [orderSn]);
+    const items = await query(
+      `select oi.*, pc.purchase_cost_jpy, pc.packaging_cost_jpy,
+              pc.domestic_shipping_jpy, pc.other_direct_cost_jpy, pc.packed_weight_g
+       from order_items oi
+       left join product_costs pc on pc.item_sku=oi.item_sku
+       where oi.order_sn=$1
+       order by oi.id`,
+      [orderSn]
+    );
     const settlement = await query(`select * from settlements where order_sn=$1`, [orderSn]);
     const profit = await query(`select * from profit_snapshots where order_sn=$1 order by calculated_at desc limit 1`, [orderSn]);
+    const missingCostSkus = items.rows
+      .filter((item) => !item.item_sku || item.purchase_cost_jpy === null || item.purchase_cost_jpy === undefined)
+      .map((item) => item.item_sku || String(item.item_id));
+
     res.json({
       order: { ...order.rows[0], order_status_ko: orderStatusKo(order.rows[0].order_status) },
       items: items.rows,
       settlement: settlement.rows[0] || null,
-      profit: profit.rows[0] || null
+      profit: profit.rows[0] || null,
+      costComplete: missingCostSkus.length === 0,
+      missingCostSkus: [...new Set(missingCostSkus)]
     });
   } catch (error) {
     res.status(500).json(safeError(error));
@@ -480,7 +493,7 @@ app.get('/api/profits', async (req, res) => {
               ) as cost_complete
        from profit_snapshots ps join orders o on o.order_sn=ps.order_sn
        ${sqlWhere}
-       order by ps.calculated_at desc limit 1000`,
+       order by o.created_time_shopee desc nulls last, ps.calculated_at desc limit 1000`,
       params
     );
     res.json({ profits: result.rows });
@@ -498,7 +511,8 @@ app.get('/api/dashboard', async (_req, res) => {
              from orders where created_time_shopee >= date_trunc('day',now())`),
       query(`select coalesce(sum(ps.actual_profit_jpy),0)::numeric as profit_jpy
              from profit_snapshots ps
-             where ps.calculated_at >= now()-interval '30 days'
+             join orders o on o.order_sn=ps.order_sn
+             where o.created_time_shopee >= now()-interval '30 days'
                and not exists (
                  select 1
                  from order_items oi
@@ -515,6 +529,7 @@ app.get('/api/dashboard', async (_req, res) => {
       todayOrders: ordersToday.rows[0].orders,
       todaySalesJpy: Number(ordersToday.rows[0].sales_jpy || 0),
       profit30DaysJpy: Number(profit30.rows[0].profit_jpy || 0),
+      profit30DaysBasis: 'order_created_time',
       marketSummary: markets.rows
     });
   } catch (error) {
