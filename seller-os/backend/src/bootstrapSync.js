@@ -1,9 +1,9 @@
 import 'dotenv/config';
 import { pool, query } from './db.js';
 import { MARKETS } from './config.js';
-import { decryptSecret, encryptSecret } from './tokenCrypto.js';
-import { getShopApi, refreshAccessToken, ShopeePaths } from './services/shopee.js';
+import { getShopApi, ShopeePaths } from './services/shopee.js';
 import {
+  getValidAccessToken,
   syncOrders,
   syncProductList,
   syncSettlement
@@ -18,50 +18,11 @@ if (!process.env.DATABASE_URL || !shouldRun) {
   process.exit(0);
 }
 
-async function issueShopScopedToken(shopId) {
-  const saved = await query(
-    `select refresh_token_encrypted from shopee_connections where shop_id=$1`,
-    [shopId]
-  );
-  if (!saved.rowCount || !saved.rows[0].refresh_token_encrypted) {
-    throw new Error('Shop 전용 Access Token 발급에 필요한 Refresh Token이 없습니다.');
-  }
-
-  const currentRefreshToken = decryptSecret(saved.rows[0].refresh_token_encrypted);
-  const token = await refreshAccessToken({
-    refreshToken: currentRefreshToken,
-    shopId
-  });
-  const nextRefreshToken = token.refresh_token || currentRefreshToken;
-  const accessExpiresAt = new Date(Date.now() + Number(token.expire_in || 14400) * 1000);
-  const refreshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-
-  await query(
-    `update shopee_connections
-     set access_token_encrypted=$2,
-         refresh_token_encrypted=$3,
-         access_token_expires_at=$4,
-         refresh_token_expires_at=$5,
-         status='CONNECTED',
-         updated_at=now()
-     where shop_id=$1`,
-    [
-      shopId,
-      encryptSecret(token.access_token),
-      encryptSecret(nextRefreshToken),
-      accessExpiresAt,
-      refreshExpiresAt
-    ]
-  );
-
-  return token.access_token;
-}
-
 async function hydrateShopConnection(shopId) {
-  const accessToken = await issueShopScopedToken(shopId);
+  const auth = await getValidAccessToken(shopId);
   const raw = await getShopApi(ShopeePaths.shopInfo, {
     shopId,
-    accessToken
+    accessToken: auth.accessToken
   });
   const info = raw?.response && typeof raw.response === 'object' ? raw.response : raw;
   const marketCode = info?.region && MARKETS[info.region] ? info.region : null;
@@ -82,7 +43,7 @@ async function hydrateShopConnection(shopId) {
   );
 
   return {
-    accessToken,
+    accessToken: auth.accessToken,
     marketCode,
     shopName: info?.shop_name || null,
     merchantId: info?.merchant_id ? Number(info.merchant_id) : null
