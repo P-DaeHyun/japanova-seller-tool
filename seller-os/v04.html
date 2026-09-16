@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>JAPANOVA Seller OS v0.4</title>
+<style>
+:root{--bg:#07100d;--panel:#0d1713;--panel2:#111d18;--line:#20342b;--text:#f4f8f6;--muted:#8ca096;--mint:#55d6a8;--amber:#f4be63;--red:#ff7884;--shadow:0 18px 50px #0008}*{box-sizing:border-box}html{color-scheme:dark}body{margin:0;background:radial-gradient(circle at 85% -15%,#173c31 0,transparent 32%),var(--bg);color:var(--text);font-family:"Noto Sans KR","Segoe UI",Arial,sans-serif;letter-spacing:-.02em}.wrap{max-width:1500px;margin:auto;padding:24px}.top{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:18px}.top h1{margin:0;font-size:22px}.sub{color:var(--muted);font-size:11px;margin-top:5px}.badges{display:flex;gap:8px;flex-wrap:wrap}.badge,.pill{display:inline-flex;padding:7px 10px;border:1px solid #28453a;border-radius:999px;background:#102019;color:#a8c5b9;font-size:10px;font-weight:800}.hero{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.card{background:linear-gradient(160deg,#0f1b16,#0b1411);border:1px solid var(--line);border-radius:15px;box-shadow:var(--shadow);padding:16px}.metric .k{font-size:10px;color:#81968c;font-weight:800}.metric .v{font-size:26px;font-weight:900;margin-top:8px}.metric .s{font-size:10px;color:#62776d;margin-top:5px}.tabs{display:flex;gap:8px;margin:20px 0 12px;flex-wrap:wrap}.tabs button,.btn{border:1px solid #2d5948;background:#123226;color:#dff9ef;padding:9px 12px;border-radius:9px;font-size:10px;font-weight:850;cursor:pointer}.tabs button{background:#101b16;border-color:#263c33;color:#879a91}.tabs button.on{background:#123226;color:#dff9ef;border-color:#2d5948}.btn.ghost{background:#111b17;border-color:#2a3c34;color:#9cafa5}.view{display:none}.view.on{display:block}.section-head{display:flex;justify-content:space-between;align-items:end;gap:12px;margin-bottom:11px}.section-head h2{margin:0;font-size:14px}.section-head p{margin:4px 0 0;color:var(--muted);font-size:10px}.actions{display:flex;gap:8px;flex-wrap:wrap}.tablewrap{overflow:auto;border:1px solid #1e3229;border-radius:13px;background:#0b1511}table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}th,td{padding:11px 10px;border-bottom:1px solid #1b2e26;text-align:left;font-size:10px;white-space:nowrap}th{position:sticky;top:0;background:#0e1915;color:#758a80;font-weight:850}td.num,th.num{text-align:right}.ok{color:var(--mint)}.warn{color:var(--amber)}.bad{color:var(--red)}.money{font-weight:850}.empty{padding:28px;text-align:center;color:#71867c}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.list{display:grid;gap:8px}.row{display:flex;justify-content:space-between;gap:12px;padding:12px;border:1px solid #1e3229;border-radius:11px;background:#0b1511}.muted{color:var(--muted);font-size:10px}.note,.flash{font-size:10px;line-height:1.65}.flash{padding:12px;border:1px solid #245d4b;background:#0d261d;color:#91e2c3;border-radius:11px;margin-bottom:12px}.flash.err{border-color:#65323b;background:#28151a;color:#ff9ca5}.flash.warn{border-color:#5b4726;background:#241c0e;color:#e7c06e}.input{height:38px;border:1px solid #294238;border-radius:9px;background:#09130f;color:#f4f8f6;padding:8px 10px;font-size:11px;outline:none;width:100%}.input:focus{border-color:#3d8068;box-shadow:0 0 0 3px #55d6a817}.form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.form label{display:grid;gap:6px;color:#84998f;font-size:10px;font-weight:750}.costbox{margin-top:12px}.markets{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.market{position:relative}.market b{font-size:13px}.market .status{position:absolute;right:12px;top:12px}.loader{opacity:.55;pointer-events:none}@media(max-width:900px){.hero,.markets{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}}@media(max-width:600px){.wrap{padding:14px}.hero,.markets,.form{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><div><h1>JAPANOVA Seller OS <span class="pill">v0.4 preview</span></h1><div class="sub">한글 운영 콘솔 · Shopee API · 원가 입력 · 실제 정산 · 7개국</div></div><div class="badges"><span id="backend" class="badge">백엔드 확인 중</span><span id="fx" class="badge">환율 확인 중</span></div></div>
+  <div id="flash" class="flash" hidden></div>
+  <section class="hero">
+    <div class="card metric"><div class="k">오늘 주문</div><div id="mOrders" class="v">-</div><div class="s">Shopee 동기화 기준</div></div>
+    <div class="card metric"><div class="k">오늘 매출</div><div id="mSales" class="v">-</div><div class="s">주문 당시 환율 · JPY</div></div>
+    <div class="card metric"><div class="k">30일 실제 순이익</div><div id="mProfit" class="v">-</div><div class="s">원가 입력 완료 주문만 신뢰</div></div>
+    <div class="card metric"><div class="k">연결 Shop</div><div id="mShops" class="v">0 / 7</div><div class="s">BR은 향후 입점</div></div>
+  </section>
+  <div class="tabs"><button class="on" data-v="products">상품·원가</button><button data-v="profits">실제 수익</button><button data-v="orders">주문</button><button data-v="markets">7개국·환율</button><button data-v="connections">Shopee 연결</button></div>
+
+  <section id="v-products" class="view on">
+    <div class="section-head"><div><h2>상품 · 일본 원가 관리</h2><p>SKU별 단위원가를 저장하면 자동 동기화 후 실제 순이익을 다시 계산해.</p></div><div class="actions"><button class="btn" id="sync">전체 동기화</button><button class="btn ghost" id="reloadProducts">새로고침</button></div></div>
+    <div class="grid2">
+      <div class="tablewrap"><table><thead><tr><th>시장</th><th>SKU</th><th>상품명</th><th>원가상태</th><th class="num">매입</th><th class="num">포장</th><th>편집</th></tr></thead><tbody id="products"></tbody></table></div>
+      <div class="card"><div class="section-head"><div><h2 id="costTitle">원가 입력</h2><p id="costSub">왼쪽 상품의 편집 버튼을 눌러.</p></div></div>
+        <form id="costForm" class="form">
+          <label>SKU<input id="cSku" class="input" readonly></label>
+          <label>포장 후 중량(g)<input id="cWeight" class="input" type="number" min="0"></label>
+          <label>일본 매입원가(JPY)<input id="cPurchase" class="input" type="number" min="0" step="1"></label>
+          <label>포장비(JPY)<input id="cPack" class="input" type="number" min="0" step="1"></label>
+          <label>일본 국내배송 배부액(JPY)<input id="cDomestic" class="input" type="number" min="0" step="1"></label>
+          <label>기타 직접비(JPY)<input id="cOther" class="input" type="number" min="0" step="1"></label>
+        </form>
+        <div class="actions costbox"><button class="btn" id="saveCost">원가 저장 + 수익 재계산</button><button class="btn ghost" id="clearCost">입력 지우기</button></div>
+        <div class="note" style="margin-top:12px">국내배송은 오사카 → SLS 거점 합배송 후 주문당 배부액을 넣는 방식이야. 매입원가가 비어 있으면 실제 순이익으로 확정하지 않아.</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="v-profits" class="view"><div class="section-head"><div><h2>실제 수익</h2><p>Escrow 실제 정산액 − 매입원가 − 포장비 − 국내배송 − 기타 직접비 − Payoneer</p></div><button class="btn ghost" id="reloadProfits">새로고침</button></div><div class="tablewrap"><table><thead><tr><th>시장</th><th>주문번호</th><th>원가상태</th><th class="num">정산 JPY</th><th class="num">매입</th><th class="num">포장</th><th class="num">국내배송</th><th class="num">순이익</th><th class="num">마진</th></tr></thead><tbody id="profits"></tbody></table></div></section>
+
+  <section id="v-orders" class="view"><div class="section-head"><div><h2>주문</h2><p>Shopee 주문상태를 한글로 표시하고 주문 당시 환율을 고정해.</p></div><button class="btn ghost" id="reloadOrders">새로고침</button></div><div class="tablewrap"><table><thead><tr><th>시장</th><th>주문번호</th><th>상태</th><th>통화</th><th class="num">총액</th><th class="num">환율</th><th class="num">JPY</th><th>주문일</th></tr></thead><tbody id="orders"></tbody></table></div></section>
+
+  <section id="v-markets" class="view"><div class="section-head"><div><h2>7개국 · 환율</h2><p>TW · SG · MY · TH · PH · VN · BR, JPY 기준 자동갱신</p></div><button class="btn" id="refreshFx">환율 지금 갱신</button></div><div id="markets" class="markets"></div></section>
+
+  <section id="v-connections" class="view"><div class="section-head"><div><h2>Shopee 연결</h2><p>서버에 암호화 저장된 Shop 연결 상태만 표시하고 토큰은 브라우저에 노출하지 않아.</p></div><button class="btn ghost" id="reloadConnections">새로고침</button></div><div id="connections" class="list"></div></section>
+</div>
+<script>
+const API='https://japanova-seller-os-api.onrender.com';
+const MARKETS=[['TW','대만','TWD'],['SG','싱가포르','SGD'],['MY','말레이시아','MYR'],['TH','태국','THB'],['PH','필리핀','PHP'],['VN','베트남','VND'],['BR','브라질','BRL']];
+const S={products:[],orders:[],profits:[],details:new Map(),fx:null};
+const $=s=>document.querySelector(s);const $$=s=>[...document.querySelectorAll(s)];
+const fmt=(n,d=0)=>Number.isFinite(Number(n))?Number(n).toLocaleString('ko-KR',{maximumFractionDigits:d}):'-';
+const yen=n=>Number.isFinite(Number(n))?'¥'+Math.round(Number(n)).toLocaleString('ko-KR'):'-';
+const pct=n=>Number.isFinite(Number(n))?(Number(n)*100).toFixed(1)+'%':'-';
+async function api(path,opt={}){const r=await fetch(API+path,{...opt,headers:{'Content-Type':'application/json',...(opt.headers||{})}});const b=await r.json().catch(()=>({}));if(!r.ok)throw new Error(b.message||'HTTP '+r.status);return b}
+function busy(v){document.body.classList.toggle('loader',v)}
+function flash(t,type='ok'){const e=$('#flash');e.hidden=false;e.textContent=t;e.className='flash '+(type==='err'?'err':type==='warn'?'warn':'');clearTimeout(flash.t);flash.t=setTimeout(()=>e.hidden=true,5000)}
+function empty(cols,msg){return `<tr><td colspan="${cols}" class="empty">${msg}</td></tr>`}
+
+async function loadTop(){try{const [h,d]=await Promise.all([api('/api/health'),api('/api/dashboard')]);$('#backend').textContent=`백엔드 정상 · DB ${h.database}`;$('#mOrders').textContent=fmt(d.todayOrders);$('#mSales').textContent=yen(d.todaySalesJpy);$('#mProfit').textContent=yen(d.profit30DaysJpy);$('#mShops').textContent=`${d.connectedShops} / 7`}catch(e){$('#backend').textContent='백엔드 오류';flash(e.message,'err')}}
+async function loadFx(force=false){try{S.fx=force?await api('/api/fx/refresh',{method:'POST',body:'{}'}):await api('/api/fx');$('#fx').textContent=`환율 정상 · ${S.fx.provider||S.fx.source||'-'}`;renderMarkets()}catch(e){$('#fx').textContent='환율 오류';flash(e.message,'err')}}
+async function loadProducts(){try{const d=await api('/api/products');S.products=d.products||[];renderProducts()}catch(e){flash(e.message,'err')}}
+function renderProducts(){const b=$('#products');if(!S.products.length){b.innerHTML=empty(7,'동기화된 상품이 없어.');return}b.innerHTML=S.products.map((p,i)=>{const missing=p.purchase_cost_jpy==null;return `<tr><td>${p.market_code||'-'}</td><td>${p.item_sku||'-'}</td><td title="${String(p.item_name||'').replaceAll('"','&quot;')}">${p.item_name||'(상품명 미수집)'}</td><td class="${missing?'warn':'ok'}">${missing?'원가 미입력':'입력 완료'}</td><td class="num">${p.purchase_cost_jpy==null?'-':yen(p.purchase_cost_jpy)}</td><td class="num">${p.packaging_cost_jpy==null?'-':yen(p.packaging_cost_jpy)}</td><td><button class="btn ghost" onclick="editCost(${i})">편집</button></td></tr>`}).join('')}
+window.editCost=i=>{const p=S.products[i];$('#cSku').value=p.item_sku||'';$('#cPurchase').value=p.purchase_cost_jpy??'';$('#cPack').value=p.packaging_cost_jpy??0;$('#cDomestic').value=p.domestic_shipping_jpy??0;$('#cOther').value=p.other_direct_cost_jpy??0;$('#cWeight').value=p.packed_weight_g??'';$('#costTitle').textContent=`원가 입력 · ${p.market_code||'-'}`;$('#costSub').textContent=p.item_name||p.item_sku||''};
+function clearCost(){['cSku','cPurchase','cPack','cDomestic','cOther','cWeight'].forEach(id=>$('#'+id).value='');$('#costTitle').textContent='원가 입력';$('#costSub').textContent='왼쪽 상품의 편집 버튼을 눌러.'}
+async function saveCost(){const sku=$('#cSku').value.trim();if(!sku){flash('먼저 상품을 선택해.','warn');return}const purchase=$('#cPurchase').value;if(purchase===''){flash('일본 매입원가를 입력해.','warn');return}busy(true);try{await api('/api/products/cost/'+encodeURIComponent(sku),{method:'PUT',body:JSON.stringify({purchaseCostJpy:Number(purchase),packagingCostJpy:Number($('#cPack').value||0),domesticShippingJpy:Number($('#cDomestic').value||0),otherDirectCostJpy:Number($('#cOther').value||0),packedWeightG:$('#cWeight').value===''?null:Number($('#cWeight').value)})});flash('원가 저장 완료. Shopee 정산을 다시 동기화해서 실제 순이익을 계산 중이야.');await api('/api/shopee/sync-all',{method:'POST',body:JSON.stringify({days:15})});await Promise.all([loadProducts(),loadOrders(),loadProfits(),loadTop()])}catch(e){flash(e.message,'err')}finally{busy(false)}}
+
+async function loadOrders(){try{const d=await api('/api/orders?limit=300');S.orders=d.orders||[];renderOrders()}catch(e){flash(e.message,'err')}}
+function renderOrders(){const b=$('#orders');if(!S.orders.length){b.innerHTML=empty(8,'동기화된 주문이 없어.');return}b.innerHTML=S.orders.map(o=>`<tr><td>${o.market_code||'-'}</td><td>${o.order_sn}</td><td><span class="pill">${o.order_status_ko||o.order_status||'-'}</span></td><td>${o.currency||'-'}</td><td class="num">${fmt(o.total_amount,2)}</td><td class="num">${o.fx_jpy_per?fmt(o.fx_jpy_per,6):'-'}</td><td class="num">${o.total_amount&&o.fx_jpy_per?yen(Number(o.total_amount)*Number(o.fx_jpy_per)):'-'}</td><td>${o.created_time_shopee?new Date(o.created_time_shopee).toLocaleString('ko-KR'):'-'}</td></tr>`).join('')}
+async function orderComplete(orderSn){if(S.details.has(orderSn))return S.details.get(orderSn);try{const d=await api('/api/orders/'+encodeURIComponent(orderSn));const costs=new Map(S.products.map(p=>[p.item_sku,p.purchase_cost_jpy]));const missing=(d.items||[]).filter(x=>!x.item_sku||costs.get(x.item_sku)==null).map(x=>x.item_sku||String(x.item_id));const out={missing};S.details.set(orderSn,out);return out}catch{return {missing:['확인실패']}}}
+async function loadProfits(){try{const d=await api('/api/profits');S.profits=d.profits||[];await renderProfits()}catch(e){flash(e.message,'err')}}
+async function renderProfits(){const b=$('#profits');if(!S.profits.length){b.innerHTML=empty(9,'계산된 정산 데이터가 없어.');return}const rows=await Promise.all(S.profits.map(async p=>{const c=await orderComplete(p.order_sn);const good=!c.missing.length;return `<tr><td>${p.market_code||'-'}</td><td>${p.order_sn}</td><td class="${good?'ok':'warn'}">${good?'원가 완료':'원가 미입력'}</td><td class="num">${yen(p.shopee_settlement_jpy)}</td><td class="num">${good?yen(p.purchase_cost_jpy):'-'}</td><td class="num">${good?yen(p.packaging_cost_jpy):'-'}</td><td class="num">${good?yen(p.domestic_shipping_jpy):'-'}</td><td class="num money ${good?(Number(p.actual_profit_jpy)>=0?'ok':'bad'):'warn'}">${good?yen(p.actual_profit_jpy):'확정 전'}</td><td class="num">${good?pct(p.actual_margin):'-'}</td></tr>`}));b.innerHTML=rows.join('')}
+
+async function renderMarkets(){let server=[];try{server=await api('/api/markets')}catch{}const by=Object.fromEntries(server.map(x=>[x.code,x]));$('#markets').innerHTML=MARKETS.map(([code,name,cur])=>{const r=S.fx?.jpyPer?.[cur];const m=by[code]||{};const st=m.connectionStatus||(code==='BR'?'향후 입점':'미연동');return `<div class="card market"><b>${name} · ${code}</b><span class="status ${st==='연결됨'?'ok':code==='BR'?'warn':'muted'}">${st}</span><div class="muted" style="margin-top:14px">${r?`1 ${cur} = ${fmt(r,r<0.1?6:4)} JPY`:'환율 대기'}</div></div>`}).join('')}
+async function loadConnections(){try{const d=await api('/api/shopee/connections');const rows=d.connections||[];$('#connections').innerHTML=rows.length?rows.map(r=>`<div class="row"><div><b>${r.market_code||'-'} · ${r.shop_name||r.shop_id}</b><div class="muted">Shop ${r.shop_id} · Merchant ${r.merchant_id||'-'}</div></div><span class="ok">${r.status==='CONNECTED'?'연결됨':r.status}</span></div>`).join(''):'<div class="empty">연결된 Shop이 없어.</div>'}catch(e){flash(e.message,'err')}}
+async function syncAll(){busy(true);try{const r=await api('/api/shopee/sync-all',{method:'POST',body:JSON.stringify({days:15})});const ok=(r.results||[]).filter(x=>x.ok).length;S.details.clear();flash(`전체 동기화 완료 ${ok}/${(r.results||[]).length} Shop`);await Promise.all([loadProducts(),loadOrders(),loadProfits(),loadTop(),loadConnections()])}catch(e){flash(e.message,'err')}finally{busy(false)}}
+
+$$('.tabs button').forEach(b=>b.onclick=()=>{$$('.tabs button').forEach(x=>x.classList.toggle('on',x===b));$$('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+b.dataset.v));if(b.dataset.v==='profits')loadProfits();if(b.dataset.v==='orders')loadOrders();if(b.dataset.v==='markets')loadFx();if(b.dataset.v==='connections')loadConnections()});
+$('#sync').onclick=syncAll;$('#reloadProducts').onclick=loadProducts;$('#saveCost').onclick=saveCost;$('#clearCost').onclick=clearCost;$('#reloadProfits').onclick=loadProfits;$('#reloadOrders').onclick=loadOrders;$('#refreshFx').onclick=()=>loadFx(true);$('#reloadConnections').onclick=loadConnections;
+(async()=>{await Promise.all([loadTop(),loadProducts(),loadOrders(),loadFx(),loadConnections()]);await loadProfits()})();
+</script>
+</body>
+</html>
