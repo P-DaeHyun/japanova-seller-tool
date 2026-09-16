@@ -1,4 +1,5 @@
 import { FX_CURRENCIES } from '../config.js';
+import { query } from '../db.js';
 
 const PRIMARY = process.env.FX_PRIMARY_URL || 'https://api.frankfurter.dev';
 const FALLBACK = process.env.FX_FALLBACK_URL || 'https://open.er-api.com/v6/latest/JPY';
@@ -11,7 +12,7 @@ async function getJson(url, timeoutMs = 10000) {
     const response = await fetch(url, {
       headers: {
         Accept: 'application/json',
-        'User-Agent': 'JAPANOVA-Seller-OS/0.1'
+        'User-Agent': 'JAPANOVA-Seller-OS/0.2'
       },
       signal: controller.signal
     });
@@ -64,6 +65,33 @@ async function fetchExchangeRateApi() {
   };
 }
 
+async function fetchLastKnownFromDb() {
+  if (!process.env.DATABASE_URL) return null;
+  try {
+    const result = await query(
+      `select distinct on (currency) currency, jpy_per, provider, source_date, captured_at
+       from fx_rates
+       where currency = any($1::text[])
+       order by currency, captured_at desc`,
+      [FX_CURRENCIES]
+    );
+    const jpyPer = Object.fromEntries(
+      result.rows.map((row) => [row.currency, Number(row.jpy_per)])
+    );
+    const missing = FX_CURRENCIES.filter((c) => !(jpyPer[c] > 0));
+    if (missing.length) return null;
+    return {
+      provider: 'JAPANOVA 마지막 정상 환율',
+      sourceDate: result.rows.map((r) => r.source_date).filter(Boolean).sort().at(-1) || null,
+      jpyPer,
+      capturedAt: result.rows.map((r) => r.captured_at).filter(Boolean).sort().at(-1) || null
+    };
+  } catch (error) {
+    console.warn('DB 환율 fallback 조회 실패:', error.message);
+    return null;
+  }
+}
+
 function convertToJpyPer(localPerJpy) {
   return Object.fromEntries(
     Object.entries(localPerJpy).map(([currency, rate]) => [currency, 1 / Number(rate)])
@@ -102,7 +130,26 @@ export async function fetchFxSnapshot({ buffer = DEFAULT_BUFFER } = {}) {
 
   const selected = primary || fallback;
   if (!selected) {
-    const error = new Error('모든 환율 소스 호출에 실패했습니다.');
+    const lastKnown = await fetchLastKnownFromDb();
+    if (lastKnown) {
+      const priceFx = Object.fromEntries(
+        Object.entries(lastKnown.jpyPer).map(([currency, rate]) => [currency, rate * (1 - buffer)])
+      );
+      return {
+        baseCurrency: 'JPY',
+        provider: lastKnown.provider,
+        sourceDate: lastKnown.sourceDate,
+        updatedAt: lastKnown.capturedAt || new Date().toISOString(),
+        status: 'stale',
+        warnings: ['실시간 환율 소스 2곳 모두 실패하여 마지막 정상 환율을 사용합니다.'],
+        errors,
+        fxBuffer: buffer,
+        jpyPer: lastKnown.jpyPer,
+        priceFx,
+        fallbackAttribution: null
+      };
+    }
+    const error = new Error('모든 환율 소스 호출에 실패했고 저장된 정상 환율도 없습니다.');
     error.causes = errors;
     throw error;
   }
