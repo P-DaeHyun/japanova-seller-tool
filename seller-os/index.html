@@ -10,7 +10,7 @@
 <body>
 <div class="shell">
   <aside class="side">
-    <div class="brand"><b>JAPANOVA</b><small>SELLER OS · 개발 프리뷰 0.2</small></div>
+    <div class="brand"><b>JAPANOVA</b><small>SELLER OS · 개발 프리뷰 0.3</small></div>
     <div class="nav">
       <button class="active" data-view="dashboard">대시보드</button>
       <button data-view="products">상품 관리</button>
@@ -26,7 +26,7 @@
   <main class="main">
     <header class="top">
       <div><h1 id="pageTitle">JAPANOVA 운영 대시보드</h1><div id="pageSub" class="sub">Shopee 상품 · 주문 · 정산 · 실제 순이익을 한 곳에서 관리</div></div>
-      <div class="topright"><span class="badge" id="backendState">백엔드 미설정</span><span class="badge" id="fxTop">환율 확인 중</span></div>
+      <div class="topright"><span class="badge" id="backendState">백엔드 확인 중</span><span class="badge" id="fxTop">환율 확인 중</span></div>
     </header>
 
     <div class="content">
@@ -34,7 +34,7 @@
 
       <section id="view-dashboard" class="view active">
         <section class="hero">
-          <div class="card metric"><div class="k">오늘 주문</div><div class="v" id="mOrders">-</div><div class="s">Production 동기화 기준</div></div>
+          <div class="card metric"><div class="k">오늘 주문</div><div class="v" id="mOrders">-</div><div class="s">실제 동기화 주문</div></div>
           <div class="card metric"><div class="k">오늘 매출</div><div class="v" id="mSales">-</div><div class="s">JPY 환산 · 7개국 합계</div></div>
           <div class="card metric"><div class="k">최근 30일 실제 순이익</div><div class="v" id="mProfit">-</div><div class="s">Escrow + JAPANOVA 원가</div></div>
           <div class="card metric"><div class="k">연결된 Shop</div><div class="v" id="mShops">0 / 7</div><div class="s">브라질은 향후 입점 예정</div></div>
@@ -46,52 +46,87 @@
         </section>
 
         <section class="section grid2">
-          <div class="card"><div class="section-head"><div><h2>개발 상태</h2><p>첫 완성 목표: 연결 → 상품 → 주문 → 정산 → 실제 순이익</p></div></div><div class="list">
+          <div class="card"><div class="section-head"><div><h2>시스템 상태</h2><p>Seller OS 본체에 기존 마진계산 기능을 흡수하는 중</p></div></div><div class="list">
+            <div class="row"><b>Render Backend</b><span id="devBackend">확인 중</span></div>
+            <div class="row"><b>PostgreSQL</b><span id="devDb">확인 중</span></div>
             <div class="row"><b>Shopee Sandbox API</b><span class="ok">검증 완료</span></div>
-            <div class="row"><b>Shop / Product / Order</b><span class="ok">검증 완료</span></div>
-            <div class="row"><b>Logistics / Escrow</b><span class="ok">검증 완료</span></div>
-            <div class="row"><b>Production 7개국 연결</b><span class="warntext">배포 후 진행</span></div>
             <div class="row"><b>실제 순이익 엔진</b><span class="ok">백엔드 V1 구현</span></div>
+            <div class="row"><b>V3.4 마진 로직</b><span class="ok">Seller OS 통합 시작</span></div>
           </div></div>
-          <div class="card"><div class="section-head"><div><h2>백엔드 연결</h2><p>Render 배포 후 API 주소를 한 번 저장</p></div></div><div class="settings"><input class="input wide" id="apiBaseInput" placeholder="https://japanova-seller-os-api.onrender.com"><div class="actions"><button class="btn" id="saveApiBase">주소 저장</button><button class="btn ghost" id="testBackend">연결 테스트</button></div></div><div class="note" style="margin-top:12px">Partner Key · access token · refresh token은 이 화면에 저장하지 않아. 비밀정보는 백엔드 환경변수와 암호화 DB에서만 처리해.</div></div>
+          <div class="card"><div class="section-head"><div><h2>백엔드 연결</h2><p>기본 Render API 주소가 자동으로 설정돼 있어</p></div></div><div class="settings"><input class="input wide" id="apiBaseInput"><div class="actions"><button class="btn" id="saveApiBase">주소 저장</button><button class="btn ghost" id="testBackend">연결 테스트</button></div></div><div class="note" style="margin-top:12px">Partner Key · access token · refresh token은 이 화면에 저장하지 않아. 비밀정보는 Render 환경변수와 암호화 DB에서만 처리해.</div></div>
         </section>
       </section>
 
       <section id="view-products" class="view">
         <div class="section-head"><div><h2>상품 관리</h2><p>Shopee 상품과 JAPANOVA 일본 매입원가 연결</p></div><div class="actions"><button class="btn" onclick="loadProducts()">새로고침</button></div></div>
-        <div class="tablewrap"><table><thead><tr><th>시장</th><th>SKU</th><th>Item ID</th><th>상품명</th><th>상태</th><th class="num">매입원가</th><th class="num">포장비</th><th>동기화</th></tr></thead><tbody id="productsBody"><tr><td colspan="8" class="empty">상품 데이터를 불러오는 중</td></tr></tbody></table></div>
-        <div class="note" style="margin-top:10px">V1 원가 DB의 매입가·포장비·국내배송비·기타비용은 SKU 단위 배부원가로 관리해. 실제 주문별 예외는 이후 주문 원가 조정 기능으로 확장할 예정이야.</div>
+        <div class="tablewrap"><table><thead><tr><th>시장</th><th>SKU</th><th>Item ID</th><th>상품명</th><th>상태</th><th class="num">매입원가</th><th class="num">포장비</th><th>동기화</th></tr></thead><tbody id="productsBody"><tr><td colspan="8" class="empty">DB 연결 후 상품을 표시해.</td></tr></tbody></table></div>
       </section>
 
       <section id="view-orders" class="view">
-        <div class="section-head"><div><h2>주문 관리</h2><p>Shopee 원문 상태코드는 내부에 보존하고 화면에는 한글 상태를 우선 표시</p></div><div class="actions"><button class="btn" onclick="loadOrders()">새로고침</button></div></div>
-        <div class="tablewrap"><table><thead><tr><th>시장</th><th>주문번호</th><th>상태</th><th>통화</th><th class="num">현지 총액</th><th class="num">주문 환율</th><th class="num">JPY 환산</th><th>주문일</th></tr></thead><tbody id="ordersBody"><tr><td colspan="8" class="empty">주문 데이터를 불러오는 중</td></tr></tbody></table></div>
+        <div class="section-head"><div><h2>주문 관리</h2><p>Shopee 원문 상태코드는 내부에 보존하고 한글 상태를 우선 표시</p></div><div class="actions"><button class="btn" onclick="loadOrders()">새로고침</button></div></div>
+        <div class="tablewrap"><table><thead><tr><th>시장</th><th>주문번호</th><th>상태</th><th>통화</th><th class="num">현지 총액</th><th class="num">주문 환율</th><th class="num">JPY 환산</th><th>주문일</th></tr></thead><tbody id="ordersBody"><tr><td colspan="8" class="empty">DB 연결 후 주문을 표시해.</td></tr></tbody></table></div>
       </section>
 
       <section id="view-profits" class="view">
-        <div class="section-head"><div><h2>수익 분석</h2><p>Shopee Escrow 실제 정산액에서 JAPANOVA 원가와 송금비를 차감</p></div><div class="actions"><button class="btn" onclick="loadProfits()">새로고침</button></div></div>
-        <div class="tablewrap"><table><thead><tr><th>시장</th><th>주문번호</th><th class="num">Shopee 정산 JPY</th><th class="num">매입원가</th><th class="num">포장비</th><th class="num">국내배송</th><th class="num">실제 순이익</th><th class="num">실제 마진</th></tr></thead><tbody id="profitsBody"><tr><td colspan="8" class="empty">수익 데이터를 불러오는 중</td></tr></tbody></table></div>
+        <div class="section-head"><div><h2>수익 분석</h2><p>Shopee 실제 정산액에서 JAPANOVA 원가와 송금비를 차감</p></div><div class="actions"><button class="btn" onclick="loadProfits()">새로고침</button></div></div>
+        <div class="tablewrap"><table><thead><tr><th>시장</th><th>주문번호</th><th class="num">Shopee 정산 JPY</th><th class="num">매입원가</th><th class="num">포장비</th><th class="num">국내배송</th><th class="num">실제 순이익</th><th class="num">실제 마진</th></tr></thead><tbody id="profitsBody"><tr><td colspan="8" class="empty">정산 동기화 후 실제 순이익을 표시해.</td></tr></tbody></table></div>
       </section>
 
       <section id="view-margin" class="view">
-        <div class="card">
-          <div class="section-head"><div><h2>기존 V3.4 마진 계산기</h2><p>판매 전 예상가 계산은 검증된 기존 계산기를 안정판으로 유지</p></div></div>
-          <div class="callout success">Seller OS는 판매 후 실제 주문·정산 수익을 담당하고, 기존 V3.4는 판매 전 예상 마진계산기로 계속 사용해. 두 엔진을 바로 합치지 않아 오류 위험을 낮춘다.</div>
-          <div class="actions" style="margin-top:14px"><button class="btn" id="openMargin">V3.4 마진계산기 열기</button></div>
+        <div class="margin-layout">
+          <div class="card calc-panel">
+            <div class="section-head"><div><h2>Seller OS 마진 계산기</h2><p>기존 V3.4의 수수료·SLS·환율 구조를 Seller OS 안에서 사용</p></div><span class="pill">JPY 기준</span></div>
+            <div class="form-grid">
+              <label>판매 국가<select id="mcMarket" class="select"><option value="대만">대만</option><option value="싱가포르">싱가포르</option><option value="말레이시아">말레이시아</option><option value="태국">태국</option><option value="필리핀">필리핀</option><option value="베트남">베트남</option><option value="브라질">브라질</option></select></label>
+              <label>매입가 (JPY)<input id="mcCost" class="input" type="number" value="1000" min="0"></label>
+              <label>포장 후 중량 (g)<input id="mcWeight" class="input" type="number" value="200" min="1"></label>
+              <label>포장비 (JPY)<input id="mcPack" class="input" type="number" value="30" min="0"></label>
+              <label>국내 운임 (JPY)<input id="mcDomesticFare" class="input" type="number" value="1350" min="0"></label>
+              <label>합배송 외부박스 (JPY)<input id="mcOuterBox" class="input" type="number" value="70" min="0"></label>
+              <label>합배송 주문수<input id="mcOrderCount" class="input" type="number" value="5" min="1"></label>
+              <label>기타 직접비 (JPY)<input id="mcOther" class="input" type="number" value="0" min="0"></label>
+              <label>목표 순이익률 (%)<input id="mcTarget" class="input" type="number" value="20" step="0.1"></label>
+              <label>Payoneer 비용 (%)<input id="mcPayoneer" class="input" type="number" value="2" step="0.1"></label>
+              <label>환율 안전마진 (%)<input id="mcBuffer" class="input" type="number" value="2" step="0.1"></label>
+              <label>예정 할인 (%)<input id="mcDiscount" class="input" type="number" value="0" step="0.1"></label>
+            </div>
+            <div id="mcDims" class="form-grid compact" hidden>
+              <label>길이 cm<input id="mcL" class="input" type="number" value="10" min="0"></label>
+              <label>폭 cm<input id="mcW" class="input" type="number" value="10" min="0"></label>
+              <label>높이 cm<input id="mcH" class="input" type="number" value="5" min="0"></label>
+            </div>
+            <div class="actions" style="margin-top:14px"><button class="btn" id="mcCalculate">계산하기</button><button class="btn ghost" id="openLegacy">기존 V3.4 확인</button></div>
+            <div id="mcMessage" class="note" style="margin-top:12px"></div>
+          </div>
+
+          <div class="card calc-result">
+            <div class="section-head"><div><h2>계산 결과</h2><p id="mcRateLabel">환율을 불러오는 중</p></div></div>
+            <div class="result-grid">
+              <div class="result"><span>권장 등록 판매가</span><strong id="mcListed">-</strong></div>
+              <div class="result"><span>할인 후 실판매가</span><strong id="mcEffective">-</strong></div>
+              <div class="result"><span>예상 순이익</span><strong id="mcProfit">-</strong></div>
+              <div class="result"><span>예상 순이익률</span><strong id="mcMargin">-</strong></div>
+              <div class="result"><span>Shopee 수수료</span><strong id="mcFee">-</strong></div>
+              <div class="result"><span>SLS 판매자 부담</span><strong id="mcSls">-</strong></div>
+              <div class="result"><span>일본 국내배송 배분</span><strong id="mcDomestic">-</strong></div>
+              <div class="result"><span>Payoneer 예상비용</span><strong id="mcPay">-</strong></div>
+            </div>
+            <div class="callout success" style="margin-top:14px">판매 전에는 이 예상 마진을 쓰고, 판매 후에는 Shopee Escrow 실제 정산값과 주문 당시 환율 스냅샷으로 실제 순이익을 다시 계산하는 구조야.</div>
+          </div>
         </div>
       </section>
 
       <section id="view-connections" class="view">
         <div class="section-head"><div><h2>Shopee 연결 관리</h2><p>Main Account 인증 후 승인된 Shop을 국가별로 저장</p></div><div class="actions"><button class="btn" onclick="loadConnections()">상태 새로고침</button><button class="btn ghost" onclick="syncAll()">전체 동기화</button></div></div>
-        <div class="card"><div id="connectionRows" class="list"><div class="empty">연결 정보를 불러오는 중</div></div></div>
-        <div class="callout" style="margin-top:12px">Production Redirect URI는 GitHub Pages가 아니라 배포한 JAPANOVA Backend의 <b>/api/shopee/callback</b>을 사용해야 해. Partner Key와 Token은 브라우저에 노출하지 않아.</div>
+        <div class="card"><div id="connectionRows" class="list"><div class="empty">DB 연결 후 연결 정보를 표시해.</div></div></div>
+        <div class="callout" style="margin-top:12px">Sandbox Redirect URI는 현재 Render Backend의 <b>/api/shopee/callback</b>을 사용하도록 준비했어. Production 전환 시 같은 서버에서 Production Partner Key를 환경변수로 교체해.</div>
       </section>
 
       <section id="view-fx" class="view">
         <div class="section-head"><div><h2>환율 관리</h2><p>JPY 기준 · 7개국 · 1차/보조 소스 · 마지막 정상값 유지</p></div><div class="actions"><button class="btn" onclick="loadFx(true)">지금 갱신</button></div></div>
         <div class="grid2">
           <div class="card"><div id="fxRows" class="list"><div class="empty">환율을 불러오는 중</div></div></div>
-          <div class="card"><div class="section-head"><div><h2>환율 상태</h2><p id="fxMeta">-</p></div></div><div id="fxWarnings" class="note">-</div><div class="note" style="margin-top:14px">자동갱신은 매일 09:15 JST. 1차 Frankfurter v2, 보조 ExchangeRate-API Open, 둘 다 실패하면 DB 마지막 정상값을 유지해. 주문에는 계산 당시 환율을 별도 저장해 과거 이익이 변하지 않게 한다.</div></div>
+          <div class="card"><div class="section-head"><div><h2>환율 상태</h2><p id="fxMeta">-</p></div></div><div id="fxWarnings" class="note">-</div><div class="note" style="margin-top:14px">자동갱신은 매일 09:15 JST. Frankfurter v2가 1차, ExchangeRate-API Open이 보조 소스야. 주문에는 계산 당시 환율을 별도 저장해 과거 순이익이 바뀌지 않게 해.</div></div>
         </div>
       </section>
 
@@ -99,6 +134,7 @@
     </div>
   </main>
 </div>
+<script src="./margin-engine.js"></script>
 <script src="./app.js"></script>
 </body>
 </html>
