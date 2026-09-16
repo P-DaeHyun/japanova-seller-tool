@@ -45,14 +45,19 @@ jobs:
       - name: Check stable frontend JavaScript syntax
         run: node --check ../app.js
 
-      - name: Check v0.4 preview inline JavaScript syntax
+      - name: Check preview inline JavaScript syntax
         shell: bash
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
-          const html = fs.readFileSync('../v04.html', 'utf8');
-          const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)];
-          if (!scripts.length) throw new Error('v04.html에서 <script>를 찾지 못했습니다.');
-          fs.writeFileSync('/tmp/japanova-v04-inline.js', scripts.map((m) => m[1]).join('\n'));
+          for (const file of ['../v04.html', '../v05.html']) {
+            const html = fs.readFileSync(file, 'utf8');
+            const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)];
+            if (!scripts.length) throw new Error(`${file}에서 <script>를 찾지 못했습니다.`);
+            const out = `/tmp/${file.split('/').pop().replace('.html','')}-inline.js`;
+            fs.writeFileSync(out, scripts.map((m) => m[1]).join('\n'));
+            console.log(out);
+          }
           NODE
-          node --check /tmp/japanova-v04-inline.js
+          node --check /tmp/v04-inline.js
+          node --check /tmp/v05-inline.js
