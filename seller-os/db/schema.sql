@@ -77,6 +77,8 @@ create table if not exists product_costs (
   unique(item_sku)
 );
 
+comment on table product_costs is '상품별 단위당 배부원가. Seller OS V1 실제수익 계산에서는 수량을 곱해 사용한다.';
+
 create table if not exists orders (
   id bigserial primary key,
   shop_id bigint not null,
@@ -159,6 +161,9 @@ create table if not exists profit_snapshots (
   calculated_at timestamptz not null default now()
 );
 
+create index if not exists idx_profit_snapshots_order_time
+  on profit_snapshots(order_sn, calculated_at desc);
+
 create table if not exists sync_logs (
   id bigserial primary key,
   scope text not null,
@@ -179,4 +184,9 @@ values
   ('PH','필리핀','PHP',true,false),
   ('VN','베트남','VND',true,false),
   ('BR','브라질','BRL',false,true)
-on conflict (code) do nothing;
+on conflict (code) do update set
+  name_ko=excluded.name_ko,
+  currency=excluded.currency,
+  active=excluded.active,
+  future_market=excluded.future_market,
+  updated_at=now();
