@@ -11,8 +11,8 @@ const BASE_URL = ENV === 'production'
   : 'https://openplatform.sandbox.test-stable.shopee.sg';
 
 const AUTH_BASE_URL = ENV === 'production'
-  ? 'https://partner.shopeemobile.com'
-  : 'https://openplatform.sandbox.test-stable.shopee.sg';
+  ? 'https://open.shopee.com'
+  : 'https://open.sandbox.test-stable.shopee.com';
 
 function requireSecrets() {
   if (!PARTNER_ID || !PARTNER_KEY) {
@@ -70,20 +70,20 @@ export function getShopeeConfigStatus() {
 }
 
 export function buildAuthorizationUrl({ redirectUri = REDIRECT_URI } = {}) {
-  requireSecrets();
+  if (!PARTNER_ID) {
+    throw new Error('SHOPEE_PARTNER_ID 환경변수가 필요합니다.');
+  }
   const cleanRedirectUri = String(redirectUri || '').trim();
   if (!cleanRedirectUri) {
     throw new Error('SHOPEE_REDIRECT_URI 환경변수가 필요합니다.');
   }
-  const path = '/api/v2/shop/auth_partner';
-  const { timestamp, sign } = signPublicApi(path);
   const qs = queryString({
     partner_id: PARTNER_ID,
-    timestamp,
-    sign,
-    redirect: cleanRedirectUri
+    auth_type: 'seller',
+    redirect_uri: cleanRedirectUri,
+    response_type: 'code'
   });
-  return `${AUTH_BASE_URL}${path}?${qs}`;
+  return `${AUTH_BASE_URL}/auth?${qs}`;
 }
 
 async function parseShopeeResponse(response) {
