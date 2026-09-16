@@ -42,6 +42,9 @@ jobs:
           node --check src/services/shopee.js
           node --check src/services/sync.js
           node --check src/services/inventory.js
+          node --check src/services/candidates.js
+          node --check src/routes/candidates.js
+          test -f ../db/candidates.sql
 
       - name: Check stable frontend JavaScript syntax
         run: |
