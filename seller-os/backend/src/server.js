@@ -21,6 +21,13 @@ import {
   syncProductList,
   syncSettlement
 } from './services/sync.js';
+import {
+  getInventoryList,
+  getInventoryMovements,
+  getInventorySummary,
+  receiveInventory,
+  setInventoryItem
+} from './services/inventory.js';
 
 const app = express();
 const port = Number(process.env.PORT || 8787);
@@ -109,7 +116,7 @@ app.get('/api/health', async (_req, res) => {
   }
   res.json({
     service: 'JAPANOVA Seller OS Backend',
-    version: '0.6.0',
+    version: '0.8.0',
     status: '정상',
     database: db,
     shopeeEnvironment: process.env.SHOPEE_ENV || 'sandbox',
@@ -256,8 +263,11 @@ app.get('/api/shopee/callback', async (req, res) => {
         );
       }
       connected.push({
-        shopId: Number(id), shopName, marketCode,
-        marketNameKo: marketCode ? MARKETS[marketCode].nameKo : '미확인', merchantId
+        shopId: Number(id),
+        shopName,
+        marketCode,
+        marketNameKo: marketCode ? MARKETS[marketCode].nameKo : '미확인',
+        merchantId
       });
     }
 
@@ -308,7 +318,11 @@ app.post('/api/shopee/refresh-token/:shopId', async (req, res) => {
   if (!requireDb(res)) return;
   try {
     const auth = await getValidAccessToken(Number(req.params.shopId));
-    res.json({ message: auth.refreshed ? 'Access Token을 갱신했습니다.' : '현재 Access Token이 아직 유효합니다.' });
+    res.json({
+      message: auth.refreshed
+        ? 'Access Token을 갱신했습니다.'
+        : '현재 Access Token이 아직 유효합니다.'
+    });
   } catch (error) {
     res.status(502).json(safeError(error));
   }
@@ -323,7 +337,9 @@ app.post('/api/shopee/sync/:shopId', async (req, res) => {
     if (scope === 'products') return res.json(await syncProductList(shopId));
     if (scope === 'orders') return res.json(await syncOrders(shopId, { days }));
     if (scope === 'settlement') {
-      if (!req.body?.orderSn) return res.status(400).json({ error: true, message: 'orderSn이 필요합니다.' });
+      if (!req.body?.orderSn) {
+        return res.status(400).json({ error: true, message: 'orderSn이 필요합니다.' });
+      }
       const settlement = await syncSettlement(shopId, String(req.body.orderSn));
       const profit = await calculateProfit(String(req.body.orderSn));
       return res.json({ settlement, profit });
@@ -338,15 +354,31 @@ app.post('/api/shopee/sync-all', async (req, res) => {
   if (!requireDb(res)) return;
   try {
     const connections = await query(
-      `select shop_id, market_code from shopee_connections where status='CONNECTED' order by market_code`
+      `select shop_id, market_code
+       from shopee_connections
+       where status='CONNECTED'
+       order by market_code`
     );
     const results = [];
     for (const row of connections.rows) {
       try {
-        const result = await syncAllForShop(Number(row.shop_id), { days: Number(req.body?.days || 7) });
-        results.push({ shopId: row.shop_id, marketCode: row.market_code, ok: true, ...result });
+        const result = await syncAllForShop(
+          Number(row.shop_id),
+          { days: Number(req.body?.days || 7) }
+        );
+        results.push({
+          shopId: row.shop_id,
+          marketCode: row.market_code,
+          ok: true,
+          ...result
+        });
       } catch (error) {
-        results.push({ shopId: row.shop_id, marketCode: row.market_code, ok: false, message: error.message });
+        results.push({
+          shopId: row.shop_id,
+          marketCode: row.market_code,
+          ok: false,
+          message: error.message
+        });
       }
     }
     res.json({ results });
@@ -359,7 +391,9 @@ app.get('/api/shopee/shipping-parameter/:orderSn', async (req, res) => {
   if (!requireDb(res)) return;
   try {
     const order = await loadLogisticsOrder(req.params.orderSn);
-    if (!order) return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
+    if (!order) {
+      return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
+    }
     const auth = await getValidAccessToken(Number(order.shop_id));
     const data = await getShopApi(ShopeePaths.shippingParameter, {
       shopId: Number(order.shop_id),
@@ -385,10 +419,15 @@ app.post('/api/shopee/ship/:orderSn', async (req, res) => {
     const orderSn = String(req.params.orderSn);
     const method = String(req.body?.method || '');
     if (!['pickup', 'dropoff', 'non_integrated'].includes(method)) {
-      return res.status(400).json({ error: true, message: 'method는 pickup, dropoff, non_integrated 중 하나여야 합니다.' });
+      return res.status(400).json({
+        error: true,
+        message: 'method는 pickup, dropoff, non_integrated 중 하나여야 합니다.'
+      });
     }
     const order = await loadLogisticsOrder(orderSn);
-    if (!order) return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
+    if (!order) {
+      return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
+    }
     if (order.order_status !== 'READY_TO_SHIP') {
       return res.status(409).json({
         error: true,
@@ -397,7 +436,10 @@ app.post('/api/shopee/ship/:orderSn', async (req, res) => {
     }
     const methodPayload = req.body?.[method];
     if (!methodPayload || typeof methodPayload !== 'object') {
-      return res.status(400).json({ error: true, message: `${method} 출고 파라미터가 필요합니다.` });
+      return res.status(400).json({
+        error: true,
+        message: `${method} 출고 파라미터가 필요합니다.`
+      });
     }
     if (process.env.SHOPEE_ENV === 'production' && req.body?.confirm !== 'SHIP') {
       return res.status(400).json({
@@ -405,6 +447,7 @@ app.post('/api/shopee/ship/:orderSn', async (req, res) => {
         message: 'Production 실제 출고에는 confirm="SHIP" 확인값이 필요합니다.'
       });
     }
+
     const auth = await getValidAccessToken(Number(order.shop_id));
     const data = await postShopApi(ShopeePaths.shipOrder, {
       shopId: Number(order.shop_id),
@@ -415,12 +458,14 @@ app.post('/api/shopee/ship/:orderSn', async (req, res) => {
         [method]: methodPayload
       }
     });
+
     let sync = null;
     try {
       sync = await syncOrders(Number(order.shop_id), { days: 15 });
     } catch (error) {
       console.warn('출고 후 주문 재동기화 실패:', error.message);
     }
+
     return res.json({
       message: 'Shopee 출고 요청을 전송했습니다.',
       orderSn,
@@ -437,7 +482,9 @@ app.get('/api/shopee/tracking/:orderSn', async (req, res) => {
   if (!requireDb(res)) return;
   try {
     const order = await loadLogisticsOrder(req.params.orderSn);
-    if (!order) return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
+    if (!order) {
+      return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
+    }
     const auth = await getValidAccessToken(Number(order.shop_id));
     const data = await getShopApi(ShopeePaths.trackingNumber, {
       shopId: Number(order.shop_id),
@@ -463,7 +510,9 @@ app.get('/api/shopee/shipping-document/parameter/:orderSn', async (req, res) => 
   if (!requireDb(res)) return;
   try {
     const order = await loadLogisticsOrder(req.params.orderSn);
-    if (!order) return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
+    if (!order) {
+      return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
+    }
     const auth = await getValidAccessToken(Number(order.shop_id));
     const data = await postShopApi(ShopeePaths.shippingDocumentParameter, {
       shopId: Number(order.shop_id),
@@ -484,13 +533,19 @@ app.post('/api/shopee/shipping-document/create/:orderSn', async (req, res) => {
   if (!requireDb(res)) return;
   try {
     const order = await loadLogisticsOrder(req.params.orderSn);
-    if (!order) return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
+    if (!order) {
+      return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
+    }
     const shippingDocumentType = String(req.body?.shippingDocumentType || '').trim();
     if (!shippingDocumentType) {
-      return res.status(400).json({ error: true, message: 'shippingDocumentType이 필요합니다.' });
+      return res.status(400).json({
+        error: true,
+        message: 'shippingDocumentType이 필요합니다.'
+      });
     }
     const auth = await getValidAccessToken(Number(order.shop_id));
     let trackingNumber = String(req.body?.trackingNumber || '').trim() || null;
+
     if (!trackingNumber) {
       try {
         const tracking = await getShopApi(ShopeePaths.trackingNumber, {
@@ -506,6 +561,7 @@ app.post('/api/shopee/shipping-document/create/:orderSn', async (req, res) => {
         console.warn('라벨 생성 전 Tracking Number 조회 실패:', error.message);
       }
     }
+
     const data = await postShopApi(ShopeePaths.createShippingDocument, {
       shopId: Number(order.shop_id),
       accessToken: auth.accessToken,
@@ -513,6 +569,7 @@ app.post('/api/shopee/shipping-document/create/:orderSn', async (req, res) => {
         order_list: [orderRef(order, { shippingDocumentType, trackingNumber })]
       }
     });
+
     return res.json({
       message: '배송라벨 생성 작업을 요청했습니다.',
       orderSn: order.order_sn,
@@ -530,7 +587,9 @@ app.get('/api/shopee/shipping-document/result/:orderSn', async (req, res) => {
   if (!requireDb(res)) return;
   try {
     const order = await loadLogisticsOrder(req.params.orderSn);
-    if (!order) return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
+    if (!order) {
+      return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
+    }
     const shippingDocumentType = String(req.query.type || '').trim();
     const auth = await getValidAccessToken(Number(order.shop_id));
     const data = await postShopApi(ShopeePaths.shippingDocumentResult, {
@@ -560,13 +619,16 @@ app.get('/api/shopee/shipping-document/download/:orderSn', async (req, res) => {
   if (!requireDb(res)) return;
   try {
     const order = await loadLogisticsOrder(req.params.orderSn);
-    if (!order) return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
+    if (!order) {
+      return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
+    }
     const shippingDocumentType = String(req.query.type || '').trim();
     if (!shippingDocumentType) {
       return res.status(400).json({ error: true, message: 'type 쿼리값이 필요합니다.' });
     }
     const auth = await getValidAccessToken(Number(order.shop_id));
     const ref = orderRef(order, { shippingDocumentType });
+
     const statusData = await postShopApi(ShopeePaths.shippingDocumentResult, {
       shopId: Number(order.shop_id),
       accessToken: auth.accessToken,
@@ -574,6 +636,7 @@ app.get('/api/shopee/shipping-document/download/:orderSn', async (req, res) => {
     });
     const statusRoot = statusData.response || statusData;
     const first = Array.isArray(statusRoot.result_list) ? statusRoot.result_list[0] : null;
+
     if (first?.status !== 'READY') {
       return res.status(409).json({
         error: true,
@@ -583,6 +646,7 @@ app.get('/api/shopee/shipping-document/download/:orderSn', async (req, res) => {
         status: first?.status || null
       });
     }
+
     const file = await postShopApiFile(ShopeePaths.downloadShippingDocument, {
       shopId: Number(order.shop_id),
       accessToken: auth.accessToken,
@@ -591,27 +655,104 @@ app.get('/api/shopee/shipping-document/download/:orderSn', async (req, res) => {
     const safeSn = String(order.order_sn).replace(/[^a-zA-Z0-9_-]/g, '_');
     const filename = `JAPANOVA_${safeSn}_${shippingDocumentType}.pdf`;
     res.setHeader('Content-Type', file.contentType || 'application/pdf');
-    res.setHeader('Content-Disposition', file.disposition || `attachment; filename="${filename}"`);
+    res.setHeader(
+      'Content-Disposition',
+      file.disposition || `attachment; filename="${filename}"`
+    );
     return res.send(file.bytes);
   } catch (error) {
     return res.status(502).json(safeError(error));
   }
 });
 
+/* ---------------- Inventory ---------------- */
+
+app.get('/api/inventory', async (req, res) => {
+  if (!requireDb(res)) return;
+  try {
+    const items = await getInventoryList({
+      search: req.query.search || '',
+      lowOnly: String(req.query.lowOnly || '') === 'true'
+    });
+    const summary = await getInventorySummary();
+    res.json({ items, summary });
+  } catch (error) {
+    res.status(500).json(safeError(error));
+  }
+});
+
+app.get('/api/inventory/summary', async (_req, res) => {
+  if (!requireDb(res)) return;
+  try {
+    res.json(await getInventorySummary());
+  } catch (error) {
+    res.status(500).json(safeError(error));
+  }
+});
+
+app.get('/api/inventory/:sku/movements', async (req, res) => {
+  if (!requireDb(res)) return;
+  try {
+    const movements = await getInventoryMovements(req.params.sku, {
+      limit: req.query.limit
+    });
+    res.json({ sku: String(req.params.sku), movements });
+  } catch (error) {
+    res.status(400).json(safeError(error));
+  }
+});
+
+app.put('/api/inventory/:sku', async (req, res) => {
+  if (!requireDb(res)) return;
+  try {
+    const result = await setInventoryItem(req.params.sku, req.body || {});
+    res.json({
+      message: '재고 설정을 저장했습니다.',
+      ...result
+    });
+  } catch (error) {
+    res.status(400).json(safeError(error));
+  }
+});
+
+app.post('/api/inventory/:sku/receive', async (req, res) => {
+  if (!requireDb(res)) return;
+  try {
+    const result = await receiveInventory(req.params.sku, req.body || {});
+    res.json({
+      message: '입고를 반영했습니다.',
+      ...result
+    });
+  } catch (error) {
+    res.status(400).json(safeError(error));
+  }
+});
+
+/* ---------------- Product / Cost ---------------- */
+
 app.get('/api/products', async (req, res) => {
   if (!requireDb(res)) return;
   const params = [];
   const where = [];
-  if (req.query.market) { params.push(String(req.query.market)); where.push(`p.market_code=$${params.length}`); }
-  if (req.query.shopId) { params.push(Number(req.query.shopId)); where.push(`p.shop_id=$${params.length}`); }
+  if (req.query.market) {
+    params.push(String(req.query.market));
+    where.push(`p.market_code=$${params.length}`);
+  }
+  if (req.query.shopId) {
+    params.push(Number(req.query.shopId));
+    where.push(`p.shop_id=$${params.length}`);
+  }
   const sqlWhere = where.length ? `where ${where.join(' and ')}` : '';
   try {
     const result = await query(
       `select p.*, pc.purchase_cost_jpy, pc.packaging_cost_jpy,
-              pc.domestic_shipping_jpy, pc.other_direct_cost_jpy, pc.packed_weight_g
-       from products p left join product_costs pc on pc.item_sku=p.item_sku
+              pc.domestic_shipping_jpy, pc.other_direct_cost_jpy,
+              pc.packed_weight_g, pc.supplier, pc.note as cost_note
+       from products p
+       left join product_costs pc on pc.item_sku=p.item_sku
        ${sqlWhere}
-       order by p.synced_at desc, p.id desc limit 1000`,
+       order by p.synced_at desc, p.id desc
+       limit 1000`,
       params
     );
     res.json({ products: result.rows });
@@ -625,6 +766,14 @@ app.put('/api/products/cost/:sku', async (req, res) => {
   const sku = String(req.params.sku);
   const b = req.body || {};
   try {
+    const purchase = b.purchaseCostJpy;
+    if (purchase === undefined || purchase === null || purchase === '') {
+      return res.status(400).json({ error: true, message: '매입원가를 입력해야 합니다.' });
+    }
+    if (!Number.isFinite(Number(purchase)) || Number(purchase) < 0) {
+      return res.status(400).json({ error: true, message: '매입원가는 0 이상의 숫자여야 합니다.' });
+    }
+
     const result = await query(
       `insert into product_costs(
          item_sku,purchase_cost_jpy,packaging_cost_jpy,domestic_shipping_jpy,
@@ -636,13 +785,21 @@ app.put('/api/products/cost/:sku', async (req, res) => {
          domestic_shipping_jpy=excluded.domestic_shipping_jpy,
          other_direct_cost_jpy=excluded.other_direct_cost_jpy,
          packed_weight_g=excluded.packed_weight_g,
-         supplier=excluded.supplier,note=excluded.note,updated_at=now()
+         supplier=excluded.supplier,
+         note=excluded.note,
+         updated_at=now()
        returning *`,
       [
-        sku, Number(b.purchaseCostJpy || 0), Number(b.packagingCostJpy || 0),
-        Number(b.domesticShippingJpy || 0), Number(b.otherDirectCostJpy || 0),
-        b.packedWeightG == null ? null : Number(b.packedWeightG),
-        b.supplier || null, b.note || null
+        sku,
+        Number(b.purchaseCostJpy),
+        Number(b.packagingCostJpy || 0),
+        Number(b.domesticShippingJpy || 0),
+        Number(b.otherDirectCostJpy || 0),
+        b.packedWeightG == null || b.packedWeightG === ''
+          ? null
+          : Number(b.packedWeightG),
+        b.supplier || null,
+        b.note || null
       ]
     );
 
@@ -655,6 +812,7 @@ app.put('/api/products/cost/:sku', async (req, res) => {
       [sku]
     );
     const recalculated = [];
+
     for (const row of affected.rows) {
       try {
         const profit = await calculateProfit(String(row.order_sn));
@@ -665,9 +823,14 @@ app.put('/api/products/cost/:sku', async (req, res) => {
           missingCostSkus: profit.missingCostSkus
         });
       } catch (error) {
-        recalculated.push({ orderSn: row.order_sn, ok: false, message: error.message });
+        recalculated.push({
+          orderSn: row.order_sn,
+          ok: false,
+          message: error.message
+        });
       }
     }
+
     res.json({
       message: '상품 원가를 저장하고 관련 주문 수익을 다시 계산했습니다.',
       cost: result.rows[0],
@@ -685,12 +848,20 @@ app.put('/api/products/cost/:sku', async (req, res) => {
   }
 });
 
+/* ---------------- Orders / Profit ---------------- */
+
 app.get('/api/orders', async (req, res) => {
   if (!requireDb(res)) return;
   const params = [];
   const where = [];
-  if (req.query.market) { params.push(String(req.query.market)); where.push(`market_code=$${params.length}`); }
-  if (req.query.status) { params.push(String(req.query.status)); where.push(`order_status=$${params.length}`); }
+  if (req.query.market) {
+    params.push(String(req.query.market));
+    where.push(`market_code=$${params.length}`);
+  }
+  if (req.query.status) {
+    params.push(String(req.query.status));
+    where.push(`order_status=$${params.length}`);
+  }
   const limit = Math.min(Math.max(Number(req.query.limit || 200), 1), 1000);
   params.push(limit);
   const sqlWhere = where.length ? `where ${where.join(' and ')}` : '';
@@ -722,23 +893,48 @@ app.get('/api/orders/:orderSn', async (req, res) => {
   try {
     const orderSn = String(req.params.orderSn);
     const order = await query(`select * from orders where order_sn=$1`, [orderSn]);
-    if (!order.rowCount) return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
+    if (!order.rowCount) {
+      return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
+    }
     const items = await query(
       `select oi.*, pc.purchase_cost_jpy, pc.packaging_cost_jpy,
-              pc.domestic_shipping_jpy, pc.other_direct_cost_jpy, pc.packed_weight_g
+              pc.domestic_shipping_jpy, pc.other_direct_cost_jpy, pc.packed_weight_g,
+              inv.on_hand_qty
        from order_items oi
        left join product_costs pc on pc.item_sku=oi.item_sku
+       left join lateral (
+         select coalesce(sum(im.quantity_delta),0)::int as on_hand_qty
+         from inventory_movements im
+         where im.item_sku=oi.item_sku
+       ) inv on true
        where oi.order_sn=$1
        order by oi.id`,
       [orderSn]
     );
-    const settlement = await query(`select * from settlements where order_sn=$1`, [orderSn]);
-    const profit = await query(`select * from profit_snapshots where order_sn=$1 order by calculated_at desc limit 1`, [orderSn]);
+    const settlement = await query(
+      `select * from settlements where order_sn=$1`,
+      [orderSn]
+    );
+    const profit = await query(
+      `select * from profit_snapshots
+       where order_sn=$1
+       order by calculated_at desc
+       limit 1`,
+      [orderSn]
+    );
     const missingCostSkus = items.rows
-      .filter((item) => !item.item_sku || item.purchase_cost_jpy === null || item.purchase_cost_jpy === undefined)
+      .filter((item) =>
+        !item.item_sku
+        || item.purchase_cost_jpy === null
+        || item.purchase_cost_jpy === undefined
+      )
       .map((item) => item.item_sku || String(item.item_id));
+
     res.json({
-      order: { ...order.rows[0], order_status_ko: orderStatusKo(order.rows[0].order_status) },
+      order: {
+        ...order.rows[0],
+        order_status_ko: orderStatusKo(order.rows[0].order_status)
+      },
       items: items.rows,
       settlement: settlement.rows[0] || null,
       profit: profit.rows[0] || null,
@@ -754,7 +950,10 @@ app.get('/api/profits', async (req, res) => {
   if (!requireDb(res)) return;
   const params = [];
   const where = [];
-  if (req.query.market) { params.push(String(req.query.market)); where.push(`o.market_code=$${params.length}`); }
+  if (req.query.market) {
+    params.push(String(req.query.market));
+    where.push(`o.market_code=$${params.length}`);
+  }
   const sqlWhere = where.length ? `where ${where.join(' and ')}` : '';
   try {
     const result = await query(
@@ -766,9 +965,11 @@ app.get('/api/profits', async (req, res) => {
                 where oi.order_sn=ps.order_sn
                   and (oi.item_sku is null or pc.purchase_cost_jpy is null)
               ) as cost_complete
-       from profit_snapshots ps join orders o on o.order_sn=ps.order_sn
+       from profit_snapshots ps
+       join orders o on o.order_sn=ps.order_sn
        ${sqlWhere}
-       order by o.created_time_shopee desc nulls last, ps.calculated_at desc limit 1000`,
+       order by o.created_time_shopee desc nulls last, ps.calculated_at desc
+       limit 1000`,
       params
     );
     res.json({ profits: result.rows });
@@ -780,32 +981,45 @@ app.get('/api/profits', async (req, res) => {
 app.get('/api/dashboard', async (_req, res) => {
   if (!requireDb(res)) return;
   try {
-    const [shops, ordersToday, profit30, markets] = await Promise.all([
+    const [shops, ordersToday, profit30, markets, inventory] = await Promise.all([
       query(`select count(*)::int as n from shopee_connections where status='CONNECTED'`),
-      query(`select count(*)::int as orders, coalesce(sum(total_amount*fx_jpy_per),0)::numeric as sales_jpy
-             from orders where created_time_shopee >= date_trunc('day',now())`),
-      query(`select coalesce(sum(ps.actual_profit_jpy),0)::numeric as profit_jpy
-             from profit_snapshots ps
-             join orders o on o.order_sn=ps.order_sn
-             where o.created_time_shopee >= now()-interval '30 days'
-               and not exists (
-                 select 1
-                 from order_items oi
-                 left join product_costs pc on pc.item_sku=oi.item_sku
-                 where oi.order_sn=ps.order_sn
-                   and (oi.item_sku is null or pc.purchase_cost_jpy is null)
-               )`),
-      query(`select market_code, count(*)::int as orders,
-                    coalesce(sum(total_amount*fx_jpy_per),0)::numeric as sales_jpy
-             from orders group by market_code order by market_code`)
+      query(
+        `select count(*)::int as orders,
+                coalesce(sum(total_amount*fx_jpy_per),0)::numeric as sales_jpy
+         from orders
+         where created_time_shopee >= date_trunc('day',now())`
+      ),
+      query(
+        `select coalesce(sum(ps.actual_profit_jpy),0)::numeric as profit_jpy
+         from profit_snapshots ps
+         join orders o on o.order_sn=ps.order_sn
+         where o.created_time_shopee >= now()-interval '30 days'
+           and not exists (
+             select 1
+             from order_items oi
+             left join product_costs pc on pc.item_sku=oi.item_sku
+             where oi.order_sn=ps.order_sn
+               and (oi.item_sku is null or pc.purchase_cost_jpy is null)
+           )`
+      ),
+      query(
+        `select market_code, count(*)::int as orders,
+                coalesce(sum(total_amount*fx_jpy_per),0)::numeric as sales_jpy
+         from orders
+         group by market_code
+         order by market_code`
+      ),
+      getInventorySummary()
     ]);
+
     res.json({
       connectedShops: shops.rows[0].n,
       todayOrders: ordersToday.rows[0].orders,
       todaySalesJpy: Number(ordersToday.rows[0].sales_jpy || 0),
       profit30DaysJpy: Number(profit30.rows[0].profit_jpy || 0),
       profit30DaysBasis: 'order_created_time',
-      marketSummary: markets.rows
+      marketSummary: markets.rows,
+      inventory
     });
   } catch (error) {
     res.status(500).json(safeError(error));
