@@ -6,6 +6,7 @@ import { query } from './db.js';
 import { encryptSecret, decryptSecret } from './tokenCrypto.js';
 import { fetchFxSnapshot } from './services/fx.js';
 import {
+  buildAuthorizationUrl,
   exchangeAuthorizationCode,
   getShopApi,
   ShopeePaths
@@ -126,6 +127,28 @@ app.post('/api/fx/refresh', async (req, res) => {
     res.json({ message: '환율을 새로 갱신했습니다.', ...snapshot });
   } catch (error) {
     res.status(502).json(safeError(error));
+  }
+});
+
+app.get('/api/shopee/authorize-url', (_req, res) => {
+  try {
+    const url = buildAuthorizationUrl();
+    res.json({
+      message: 'Shopee Sandbox 인증 URL을 생성했습니다.',
+      environment: process.env.SHOPEE_ENV || 'sandbox',
+      redirectUri: process.env.SHOPEE_REDIRECT_URI || null,
+      url
+    });
+  } catch (error) {
+    res.status(500).json(safeError(error));
+  }
+});
+
+app.get('/api/shopee/authorize', (_req, res) => {
+  try {
+    res.redirect(buildAuthorizationUrl());
+  } catch (error) {
+    res.status(500).json(safeError(error));
   }
 });
 
