@@ -4,6 +4,7 @@ import { MARKETS } from './config.js';
 import { decryptSecret, encryptSecret } from './tokenCrypto.js';
 import { getShopApi, refreshAccessToken, ShopeePaths } from './services/shopee.js';
 import {
+  calculateProfit,
   getValidAccessToken,
   syncOrders,
   syncProductList,
@@ -137,17 +138,24 @@ try {
       const orders = await syncOrders(shopId, { days: 15 });
 
       let settlements = 0;
+      let profits = 0;
+      let profitComplete = 0;
+      let profitPendingCost = 0;
       for (const orderSn of orders.orderSns || []) {
         try {
           await syncSettlement(shopId, orderSn, hydrated.accessToken);
           settlements += 1;
+          const profit = await calculateProfit(orderSn);
+          profits += 1;
+          if (profit.missingCostSkus.length) profitPendingCost += 1;
+          else profitComplete += 1;
         } catch (error) {
-          console.warn(`JAPANOVA 정산 동기화 건너뜀 ${orderSn}: ${error.message}`);
+          console.warn(`JAPANOVA 정산/수익 동기화 건너뜀 ${orderSn}: ${error.message}`);
         }
       }
 
       console.log(
-        `JAPANOVA 시작 동기화 완료: shop=${shopId} products=${products.synced} orders=${orders.synced} settlements=${settlements}`
+        `JAPANOVA 시작 동기화 완료: shop=${shopId} products=${products.synced} orders=${orders.synced} settlements=${settlements} profits=${profits} profit_complete=${profitComplete} profit_pending_cost=${profitPendingCost}`
       );
     } catch (error) {
       console.warn(`JAPANOVA 시작 동기화 실패 shop=${shopId}: ${error.message}`);
