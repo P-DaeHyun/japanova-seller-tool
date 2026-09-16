@@ -146,41 +146,6 @@ export async function postShopApi(path, { shopId, accessToken, body = {} }) {
   return parseShopeeResponse(response);
 }
 
-async function enrichMainAccountShopIds(token) {
-  const existingShopIds = Array.isArray(token.shop_id_list) ? token.shop_id_list : [];
-  if (existingShopIds.length > 0) return token;
-
-  const merchantIds = Array.isArray(token.merchant_id_list) ? token.merchant_id_list : [];
-  if (!merchantIds.length || !token.access_token) return token;
-
-  const discovered = new Set();
-  for (const merchantId of merchantIds) {
-    for (let pageNo = 1; pageNo <= 20; pageNo += 1) {
-      const data = await getMerchantApi('/api/v2/merchant/get_shop_list_by_merchant', {
-        merchantId: Number(merchantId),
-        accessToken: token.access_token,
-        params: { page_no: pageNo, page_size: 500 }
-      });
-      const shopList = Array.isArray(data.shop_list)
-        ? data.shop_list
-        : (Array.isArray(data.response?.shop_list) ? data.response.shop_list : []);
-      for (const row of shopList) {
-        if (row?.shop_id) discovered.add(Number(row.shop_id));
-        for (const affi of row?.sip_affi_shops || []) {
-          if (affi?.affi_shop_id) discovered.add(Number(affi.affi_shop_id));
-        }
-      }
-      const more = Boolean(data.more ?? data.response?.more);
-      if (!more || shopList.length === 0) break;
-    }
-  }
-
-  if (discovered.size > 0) {
-    token.shop_id_list = [...discovered];
-  }
-  return token;
-}
-
 export async function exchangeAuthorizationCode({ code, shopId, mainAccountId }) {
   const path = '/api/v2/auth/token/get';
   const { timestamp, sign } = signPublicApi(path);
@@ -197,17 +162,16 @@ export async function exchangeAuthorizationCode({ code, shopId, mainAccountId })
   });
   const token = await parseShopeeResponse(response);
 
+  // 중요: merchant에 속한 Shop 목록과 실제로 이번 인증에서 승인된 Shop 목록은 다르다.
+  // Main Account 인증은 Shopee가 token.shop_id_list로 돌려준 Shop만 승인된 Shop으로 취급한다.
+  // merchant API로 발견한 Shop을 shop_id_list에 임의로 합치면 refresh_token과 shop_id가 불일치할 수 있다.
   if (mainAccountId) {
-    try {
-      await enrichMainAccountShopIds(token);
+    const authorizedShopIds = Array.isArray(token.shop_id_list)
+      ? token.shop_id_list.map(Number).filter(Boolean)
+      : [];
 
-      // Main Account 인증의 초기 토큰은 여러 Shop/Merchant에 공통으로 내려올 수 있다.
-      // Sandbox처럼 승인 Shop이 1개인 경우 즉시 Shop 전용 토큰으로 분리해서 저장한다.
-      const authorizedShopIds = Array.isArray(token.shop_id_list)
-        ? token.shop_id_list.map(Number).filter(Boolean)
-        : [];
-
-      if (authorizedShopIds.length === 1 && token.refresh_token) {
+    if (authorizedShopIds.length === 1 && token.refresh_token) {
+      try {
         const scoped = await refreshAccessToken({
           refreshToken: token.refresh_token,
           shopId: authorizedShopIds[0]
@@ -216,11 +180,12 @@ export async function exchangeAuthorizationCode({ code, shopId, mainAccountId })
         token.refresh_token = scoped.refresh_token || token.refresh_token;
         token.expire_in = scoped.expire_in || token.expire_in;
         token.scoped_shop_id = authorizedShopIds[0];
+      } catch (error) {
+        console.warn('Main-account Shop token scoping failed:', error.message);
       }
-    } catch (error) {
-      console.warn('Main-account shop discovery/token scoping failed:', error.message);
     }
   }
+
   return token;
 }
 
