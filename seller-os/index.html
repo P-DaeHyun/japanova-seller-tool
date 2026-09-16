@@ -3,56 +3,102 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
 <title>JAPANOVA Seller OS</title>
-<style>
-:root{--bg:#07100d;--panel:#0d1713;--panel2:#111d18;--line:#20342b;--text:#f4f8f6;--muted:#8ca096;--mint:#55d6a8;--mint2:#9ce9cb;--amber:#f4be63;--red:#ff7884;--shadow:0 18px 50px #0008}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 85% -15%,#173c31 0,transparent 32%),var(--bg);color:var(--text);font-family:"Noto Sans KR","Segoe UI",Arial,sans-serif;letter-spacing:-.02em}.shell{display:grid;grid-template-columns:230px 1fr;min-height:100vh}.side{border-right:1px solid #183027;background:#08110ecc;padding:24px 16px;position:sticky;top:0;height:100vh}.brand{padding:4px 10px 24px}.brand b{font-size:21px;letter-spacing:.08em}.brand small{display:block;color:#60746a;font-size:10px;margin-top:6px;letter-spacing:.12em}.nav{display:grid;gap:6px}.nav button{border:0;background:transparent;color:#8fa39a;text-align:left;padding:12px 13px;border-radius:10px;font-weight:750;cursor:pointer}.nav button.active,.nav button:hover{background:#13231d;color:#dff8ee}.nav button.active{box-shadow:inset 3px 0 var(--mint)}.sidefoot{position:absolute;left:20px;right:20px;bottom:22px;color:#5e7369;font-size:10px;line-height:1.7}.main{min-width:0}.top{min-height:78px;padding:18px 28px;border-bottom:1px solid #193027;background:#08110edb;backdrop-filter:blur(14px);display:flex;justify-content:space-between;align-items:center;gap:16px;position:sticky;top:0;z-index:5}.top h1{margin:0;font-size:19px}.top .sub{color:var(--muted);font-size:11px;margin-top:4px}.badge{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid #28453a;border-radius:9px;background:#102019;color:#a8c5b9;font-size:10px;font-weight:800}.content{max-width:1500px;margin:auto;padding:24px 28px 50px}.hero{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.card{background:linear-gradient(160deg,#0f1b16,#0b1411);border:1px solid var(--line);border-radius:15px;box-shadow:var(--shadow);padding:16px}.metric .k{font-size:10px;color:#81968c;font-weight:800}.metric .v{font-size:25px;font-weight:900;margin-top:9px}.metric .s{font-size:10px;color:#62776d;margin-top:5px}.section{margin-top:20px}.section-head{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-bottom:11px}.section h2{margin:0;font-size:14px}.section p{margin:4px 0 0;color:var(--muted);font-size:10px}.markets{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px}.market{position:relative}.market .name{font-weight:850;font-size:14px}.market .code{font-size:10px;color:#657a70;margin-left:5px}.status{position:absolute;right:13px;top:13px;font-size:9px;padding:4px 7px;border-radius:999px;border:1px solid #38493f;color:#a0b1a9}.status.on{border-color:#256f58;color:#76ddb8;background:#0e2b21}.status.future{border-color:#67532d;color:#f2c46d;background:#2b2110}.fx{margin-top:15px;padding-top:13px;border-top:1px solid #1c3027}.fxline{display:flex;justify-content:space-between;gap:10px;align-items:baseline;font-variant-numeric:tabular-nums}.fxline strong{font-size:17px}.fxline span{font-size:9px;color:#758a80}.buffer{margin-top:5px;color:#5f756a;font-size:9px}.actions{display:flex;gap:8px;flex-wrap:wrap}.btn{border:1px solid #2d5948;background:#123226;color:#dff9ef;padding:9px 12px;border-radius:9px;font-size:10px;font-weight:850;cursor:pointer}.btn:hover{filter:brightness(1.13)}.btn.ghost{background:#111b17;border-color:#2a3c34;color:#9cafa5}.grid2{display:grid;grid-template-columns:1.15fr .85fr;gap:12px}.list{display:grid;gap:8px}.row{display:flex;justify-content:space-between;gap:12px;padding:12px;border:1px solid #1e3229;border-radius:11px;background:#0b1511}.row b{font-size:11px}.row span{font-size:10px;color:#758a80}.ok{color:var(--mint)!important}.warn{color:var(--amber)!important}.muted{color:var(--muted)}.note{font-size:10px;color:#6e8278;line-height:1.7}.footer{margin-top:22px;text-align:center;color:#53685e;font-size:9px}.footer a{color:#6d9483;text-decoration:none}.footer a:hover{text-decoration:underline}@media(max-width:1100px){.hero,.markets{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}.shell{grid-template-columns:190px 1fr}}@media(max-width:720px){.shell{display:block}.side{position:static;height:auto;border-right:0;border-bottom:1px solid #183027}.sidefoot{display:none}.nav{grid-template-columns:repeat(3,1fr)}.nav button{text-align:center;padding:9px 5px;font-size:11px}.top{position:static;padding:15px}.content{padding:15px}.hero,.markets{grid-template-columns:1fr}.top .badge{display:none}}
-</style>
+<link rel="stylesheet" href="./styles.css">
 </head>
 <body>
 <div class="shell">
-<aside class="side">
-  <div class="brand"><b>JAPANOVA</b><small>SELLER OS · 개발 프리뷰 0.1</small></div>
-  <div class="nav">
-    <button class="active">대시보드</button><button>상품 관리</button><button>주문 관리</button><button>수익 분석</button><button>마진 계산기</button><button>Shopee 연결</button><button>환율 관리</button>
-  </div>
-  <div class="sidefoot">JAPAN → SHOPEE 7 MARKETS<br>한글 운영 콘솔<br><br>기존 V3.4 마진계산기와 분리 개발</div>
-</aside>
-<main class="main">
-<header class="top"><div><h1>JAPANOVA 운영 대시보드</h1><div class="sub">Shopee 상품 · 주문 · 정산 · 실제 순이익을 한 곳에서 관리</div></div><span class="badge" id="fxTop">환율 불러오는 중</span></header>
-<div class="content">
-  <section class="hero">
-    <div class="card metric"><div class="k">오늘 주문</div><div class="v">-</div><div class="s">Production 연결 후 표시</div></div>
-    <div class="card metric"><div class="k">오늘 매출</div><div class="v">-</div><div class="s">7개국 합계</div></div>
-    <div class="card metric"><div class="k">실제 순이익</div><div class="v">-</div><div class="s">Escrow + JAPANOVA 원가</div></div>
-    <div class="card metric"><div class="k">연결된 Shop</div><div class="v">0 / 7</div><div class="s">브라질은 향후 입점 예정</div></div>
-  </section>
+  <aside class="side">
+    <div class="brand"><b>JAPANOVA</b><small>SELLER OS · 개발 프리뷰 0.2</small></div>
+    <div class="nav">
+      <button class="active" data-view="dashboard">대시보드</button>
+      <button data-view="products">상품 관리</button>
+      <button data-view="orders">주문 관리</button>
+      <button data-view="profits">수익 분석</button>
+      <button data-view="margin">마진 계산기</button>
+      <button data-view="connections">Shopee 연결</button>
+      <button data-view="fx">환율 관리</button>
+    </div>
+    <div class="sidefoot">JAPAN → SHOPEE 7 MARKETS<br>한글 운영 콘솔<br><br>TW · SG · MY · TH · PH · VN · BR</div>
+  </aside>
 
-  <section class="section">
-    <div class="section-head"><div><h2>7개국 연결 · 환율</h2><p>기준환율과 2% 안전마진을 적용한 판매가 계산환율을 분리 표시</p></div><div class="actions"><button class="btn" onclick="loadFx(true)">환율 새로고침</button></div></div>
-    <div class="markets" id="markets"></div>
-  </section>
+  <main class="main">
+    <header class="top">
+      <div><h1 id="pageTitle">JAPANOVA 운영 대시보드</h1><div id="pageSub" class="sub">Shopee 상품 · 주문 · 정산 · 실제 순이익을 한 곳에서 관리</div></div>
+      <div class="topright"><span class="badge" id="backendState">백엔드 미설정</span><span class="badge" id="fxTop">환율 확인 중</span></div>
+    </header>
 
-  <section class="section grid2">
-    <div class="card"><div class="section-head"><div><h2>개발 상태</h2><p>첫 완성 목표: 연결 → 상품 → 주문 → 정산 → 실제 순이익</p></div></div><div class="list">
-      <div class="row"><b>Shopee Sandbox API</b><span class="ok">검증 완료</span></div>
-      <div class="row"><b>Shop / Product / Order</b><span class="ok">검증 완료</span></div>
-      <div class="row"><b>Logistics / Escrow</b><span class="ok">검증 완료</span></div>
-      <div class="row"><b>Production 7개국 연결</b><span class="warn">다음 단계</span></div>
-      <div class="row"><b>실제 순이익 엔진</b><span>개발 예정</span></div>
-    </div></div>
-    <div class="card"><div class="section-head"><div><h2>보안 원칙</h2><p>Partner Key와 Token은 화면에 두지 않음</p></div></div><div class="note">Shopee API HMAC 서명, Authorization Code 교환, access/refresh token 처리는 모두 JAPANOVA Backend에서 수행한다. GitHub Pages에는 비밀키를 저장하지 않는다. 주문별 환율은 스냅샷으로 저장해 환율이 바뀌어도 과거 순이익이 변하지 않게 한다.</div></div>
-  </section>
-  <div class="footer">JAPANOVA Seller OS · 한국어 우선 UI · JPY 기준 · TW / SG / MY / TH / PH / VN / BR <span id="fxAttribution"></span></div>
+    <div class="content">
+      <div id="flash" class="callout" hidden></div>
+
+      <section id="view-dashboard" class="view active">
+        <section class="hero">
+          <div class="card metric"><div class="k">오늘 주문</div><div class="v" id="mOrders">-</div><div class="s">Production 동기화 기준</div></div>
+          <div class="card metric"><div class="k">오늘 매출</div><div class="v" id="mSales">-</div><div class="s">JPY 환산 · 7개국 합계</div></div>
+          <div class="card metric"><div class="k">최근 30일 실제 순이익</div><div class="v" id="mProfit">-</div><div class="s">Escrow + JAPANOVA 원가</div></div>
+          <div class="card metric"><div class="k">연결된 Shop</div><div class="v" id="mShops">0 / 7</div><div class="s">브라질은 향후 입점 예정</div></div>
+        </section>
+
+        <section class="section">
+          <div class="section-head"><div><h2>7개국 연결 · 환율</h2><p>기준환율과 안전마진을 적용한 판매가 계산환율을 분리 표시</p></div><div class="actions"><button class="btn" id="refreshFx">환율 새로고침</button><button class="btn ghost" id="syncAll">전체 동기화</button></div></div>
+          <div class="markets" id="markets"></div>
+        </section>
+
+        <section class="section grid2">
+          <div class="card"><div class="section-head"><div><h2>개발 상태</h2><p>첫 완성 목표: 연결 → 상품 → 주문 → 정산 → 실제 순이익</p></div></div><div class="list">
+            <div class="row"><b>Shopee Sandbox API</b><span class="ok">검증 완료</span></div>
+            <div class="row"><b>Shop / Product / Order</b><span class="ok">검증 완료</span></div>
+            <div class="row"><b>Logistics / Escrow</b><span class="ok">검증 완료</span></div>
+            <div class="row"><b>Production 7개국 연결</b><span class="warntext">배포 후 진행</span></div>
+            <div class="row"><b>실제 순이익 엔진</b><span class="ok">백엔드 V1 구현</span></div>
+          </div></div>
+          <div class="card"><div class="section-head"><div><h2>백엔드 연결</h2><p>Render 배포 후 API 주소를 한 번 저장</p></div></div><div class="settings"><input class="input wide" id="apiBaseInput" placeholder="https://japanova-seller-os-api.onrender.com"><div class="actions"><button class="btn" id="saveApiBase">주소 저장</button><button class="btn ghost" id="testBackend">연결 테스트</button></div></div><div class="note" style="margin-top:12px">Partner Key · access token · refresh token은 이 화면에 저장하지 않아. 비밀정보는 백엔드 환경변수와 암호화 DB에서만 처리해.</div></div>
+        </section>
+      </section>
+
+      <section id="view-products" class="view">
+        <div class="section-head"><div><h2>상품 관리</h2><p>Shopee 상품과 JAPANOVA 일본 매입원가 연결</p></div><div class="actions"><button class="btn" onclick="loadProducts()">새로고침</button></div></div>
+        <div class="tablewrap"><table><thead><tr><th>시장</th><th>SKU</th><th>Item ID</th><th>상품명</th><th>상태</th><th class="num">매입원가</th><th class="num">포장비</th><th>동기화</th></tr></thead><tbody id="productsBody"><tr><td colspan="8" class="empty">상품 데이터를 불러오는 중</td></tr></tbody></table></div>
+        <div class="note" style="margin-top:10px">V1 원가 DB의 매입가·포장비·국내배송비·기타비용은 SKU 단위 배부원가로 관리해. 실제 주문별 예외는 이후 주문 원가 조정 기능으로 확장할 예정이야.</div>
+      </section>
+
+      <section id="view-orders" class="view">
+        <div class="section-head"><div><h2>주문 관리</h2><p>Shopee 원문 상태코드는 내부에 보존하고 화면에는 한글 상태를 우선 표시</p></div><div class="actions"><button class="btn" onclick="loadOrders()">새로고침</button></div></div>
+        <div class="tablewrap"><table><thead><tr><th>시장</th><th>주문번호</th><th>상태</th><th>통화</th><th class="num">현지 총액</th><th class="num">주문 환율</th><th class="num">JPY 환산</th><th>주문일</th></tr></thead><tbody id="ordersBody"><tr><td colspan="8" class="empty">주문 데이터를 불러오는 중</td></tr></tbody></table></div>
+      </section>
+
+      <section id="view-profits" class="view">
+        <div class="section-head"><div><h2>수익 분석</h2><p>Shopee Escrow 실제 정산액에서 JAPANOVA 원가와 송금비를 차감</p></div><div class="actions"><button class="btn" onclick="loadProfits()">새로고침</button></div></div>
+        <div class="tablewrap"><table><thead><tr><th>시장</th><th>주문번호</th><th class="num">Shopee 정산 JPY</th><th class="num">매입원가</th><th class="num">포장비</th><th class="num">국내배송</th><th class="num">실제 순이익</th><th class="num">실제 마진</th></tr></thead><tbody id="profitsBody"><tr><td colspan="8" class="empty">수익 데이터를 불러오는 중</td></tr></tbody></table></div>
+      </section>
+
+      <section id="view-margin" class="view">
+        <div class="card">
+          <div class="section-head"><div><h2>기존 V3.4 마진 계산기</h2><p>판매 전 예상가 계산은 검증된 기존 계산기를 안정판으로 유지</p></div></div>
+          <div class="callout success">Seller OS는 판매 후 실제 주문·정산 수익을 담당하고, 기존 V3.4는 판매 전 예상 마진계산기로 계속 사용해. 두 엔진을 바로 합치지 않아 오류 위험을 낮춘다.</div>
+          <div class="actions" style="margin-top:14px"><button class="btn" id="openMargin">V3.4 마진계산기 열기</button></div>
+        </div>
+      </section>
+
+      <section id="view-connections" class="view">
+        <div class="section-head"><div><h2>Shopee 연결 관리</h2><p>Main Account 인증 후 승인된 Shop을 국가별로 저장</p></div><div class="actions"><button class="btn" onclick="loadConnections()">상태 새로고침</button><button class="btn ghost" onclick="syncAll()">전체 동기화</button></div></div>
+        <div class="card"><div id="connectionRows" class="list"><div class="empty">연결 정보를 불러오는 중</div></div></div>
+        <div class="callout" style="margin-top:12px">Production Redirect URI는 GitHub Pages가 아니라 배포한 JAPANOVA Backend의 <b>/api/shopee/callback</b>을 사용해야 해. Partner Key와 Token은 브라우저에 노출하지 않아.</div>
+      </section>
+
+      <section id="view-fx" class="view">
+        <div class="section-head"><div><h2>환율 관리</h2><p>JPY 기준 · 7개국 · 1차/보조 소스 · 마지막 정상값 유지</p></div><div class="actions"><button class="btn" onclick="loadFx(true)">지금 갱신</button></div></div>
+        <div class="grid2">
+          <div class="card"><div id="fxRows" class="list"><div class="empty">환율을 불러오는 중</div></div></div>
+          <div class="card"><div class="section-head"><div><h2>환율 상태</h2><p id="fxMeta">-</p></div></div><div id="fxWarnings" class="note">-</div><div class="note" style="margin-top:14px">자동갱신은 매일 09:15 JST. 1차 Frankfurter v2, 보조 ExchangeRate-API Open, 둘 다 실패하면 DB 마지막 정상값을 유지해. 주문에는 계산 당시 환율을 별도 저장해 과거 이익이 변하지 않게 한다.</div></div>
+        </div>
+      </section>
+
+      <div class="footer">JAPANOVA Seller OS · 한국어 우선 UI · JPY 기준 · TW / SG / MY / TH / PH / VN / BR</div>
+    </div>
+  </main>
 </div>
-</main>
-</div>
-<script>
-const markets=[['TW','대만','TWD',1],['SG','싱가포르','SGD',1],['MY','말레이시아','MYR',1],['TH','태국','THB',1],['PH','필리핀','PHP',1],['VN','베트남','VND',1],['BR','브라질','BRL',0]];
-const fmt=n=>Number.isFinite(n)?n.toLocaleString('ko-KR',{maximumFractionDigits:n<0.1?6:4}):'-';
-function render(fx){const box=document.getElementById('markets');box.innerHTML=markets.map(([code,name,cur,active])=>{const rate=fx?.jpyPer?.[cur];const buffer=fx?.fxBufferDefault??0.02;const price=rate?rate*(1-buffer):null;const st=active?'미연동':'향후 입점';const cls=active?'':'future';return `<div class="card market"><div><span class="name">${name}</span><span class="code">${code} · ${cur}</span></div><span class="status ${cls}">${st}</span><div class="fx"><div class="fxline"><span>기준 환율</span><strong>${rate?`1 ${cur} = ${fmt(rate)} JPY`:'자동갱신 대기'}</strong></div><div class="buffer">판매가 계산환율: ${price?fmt(price)+' JPY':'-'} · 안전마진 ${(buffer*100).toFixed(0)}%</div></div></div>`}).join('')}
-function setAttribution(fx){const el=document.getElementById('fxAttribution');if(String(fx?.source||'').includes('ExchangeRate-API')){el.innerHTML=' · <a href="https://www.exchangerate-api.com" target="_blank" rel="noopener">Rates By Exchange Rate API</a>'}else{el.textContent=''}}
-async function loadFx(force=false){const top=document.getElementById('fxTop');top.textContent='환율 확인 중';try{const r=await fetch('../fx.json'+(force?'?t='+Date.now():''),{cache:force?'no-store':'default'});if(!r.ok)throw new Error('HTTP '+r.status);const fx=await r.json();render(fx);setAttribution(fx);const br=fx.jpyPer?.BRL?'7개국':'브라질 대기';top.textContent=`환율 ${fx.status==='warning'?'주의':'정상'} · ${br} · ${fx.fxVersion||''}`;}catch(e){render(null);setAttribution(null);top.textContent='환율 불러오기 실패';}}
-render(null);loadFx();
-</script>
+<script src="./app.js"></script>
 </body>
 </html>
