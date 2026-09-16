@@ -4,6 +4,7 @@ import {
   listCandidates,
   saveCandidate
 } from '../services/candidates.js';
+import researchRouter from './research.js';
 
 const router = Router();
 
@@ -19,6 +20,9 @@ function fail(res, error, status = 400) {
     message: error?.message || '후보상품 처리 중 오류가 발생했습니다.'
   });
 }
+
+/* 경쟁상품 조사는 후보상품 저장 여부와 무관하게 사용할 수 있다. */
+router.use('/research', researchRouter);
 
 router.get('/', async (_req, res) => {
   if (!requireDb(res)) return;
