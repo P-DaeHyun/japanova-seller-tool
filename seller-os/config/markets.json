@@ -1,0 +1,66 @@
+{
+  "baseCurrency": "JPY",
+  "defaultFxBuffer": 0.02,
+  "markets": [
+    {
+      "code": "TW",
+      "nameKo": "대만",
+      "currency": "TWD",
+      "active": true,
+      "shopeeConnected": false
+    },
+    {
+      "code": "SG",
+      "nameKo": "싱가포르",
+      "currency": "SGD",
+      "active": true,
+      "shopeeConnected": false
+    },
+    {
+      "code": "MY",
+      "nameKo": "말레이시아",
+      "currency": "MYR",
+      "active": true,
+      "shopeeConnected": false
+    },
+    {
+      "code": "TH",
+      "nameKo": "태국",
+      "currency": "THB",
+      "active": true,
+      "shopeeConnected": false
+    },
+    {
+      "code": "PH",
+      "nameKo": "필리핀",
+      "currency": "PHP",
+      "active": true,
+      "shopeeConnected": false
+    },
+    {
+      "code": "VN",
+      "nameKo": "베트남",
+      "currency": "VND",
+      "active": true,
+      "shopeeConnected": false
+    },
+    {
+      "code": "BR",
+      "nameKo": "브라질",
+      "currency": "BRL",
+      "active": false,
+      "futureMarket": true,
+      "shopeeConnected": false
+    }
+  ],
+  "statusLabelsKo": {
+    "READY_TO_SHIP": "배송 준비 중",
+    "PROCESSED": "출고 처리됨",
+    "SHIPPED": "배송 중",
+    "TO_CONFIRM_RECEIVE": "수령 확인 대기",
+    "COMPLETED": "완료",
+    "CANCELLED": "취소",
+    "IN_CANCEL": "취소 처리 중",
+    "UNPAID": "결제 대기"
+  }
+}
