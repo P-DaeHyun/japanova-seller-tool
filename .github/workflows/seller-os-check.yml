@@ -50,7 +50,7 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
-          for (const file of ['../v04.html', '../v05.html']) {
+          for (const file of ['../v04.html', '../v05.html', '../v06.html']) {
             const html = fs.readFileSync(file, 'utf8');
             const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)];
             if (!scripts.length) throw new Error(`${file}에서 <script>를 찾지 못했습니다.`);
@@ -61,3 +61,4 @@ jobs:
           NODE
           node --check /tmp/v04-inline.js
           node --check /tmp/v05-inline.js
+          node --check /tmp/v06-inline.js
