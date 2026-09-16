@@ -41,6 +41,7 @@ jobs:
           node --check src/services/fx.js
           node --check src/services/shopee.js
           node --check src/services/sync.js
+          node --check src/services/inventory.js
 
       - name: Check stable frontend JavaScript syntax
         run: node --check ../app.js
@@ -50,7 +51,7 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
-          for (const file of ['../v04.html', '../v05.html', '../v06.html', '../v07.html']) {
+          for (const file of ['../v04.html', '../v05.html', '../v06.html', '../v07.html', '../v08.html']) {
             const html = fs.readFileSync(file, 'utf8');
             const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)];
             if (!scripts.length) throw new Error(`${file}에서 <script>를 찾지 못했습니다.`);
@@ -63,3 +64,4 @@ jobs:
           node --check /tmp/v05-inline.js
           node --check /tmp/v06-inline.js
           node --check /tmp/v07-inline.js
+          node --check /tmp/v08-inline.js
