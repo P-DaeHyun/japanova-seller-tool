@@ -175,6 +175,114 @@ create table if not exists sync_logs (
   finished_at timestamptz
 );
 
+-- 일본 실물재고 설정. tracking_started_at 이후 생성된 주문만 자동 차감해
+-- 기존 주문을 재동기화했을 때 재고가 소급해서 마이너스 되는 것을 방지한다.
+create table if not exists inventory_items (
+  item_sku text primary key,
+  safety_stock_qty integer not null default 0 check (safety_stock_qty >= 0),
+  target_stock_qty integer not null default 0 check (target_stock_qty >= 0),
+  supplier text,
+  supplier_url text,
+  lead_time_days integer check (lead_time_days is null or lead_time_days >= 0),
+  note text,
+  tracking_started_at timestamptz,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists inventory_movements (
+  id bigserial primary key,
+  item_sku text not null,
+  quantity_delta integer not null,
+  movement_type text not null,
+  source_key text unique,
+  order_sn text references orders(order_sn) on delete set null,
+  unit_purchase_cost_jpy numeric(20,2),
+  supplier text,
+  note text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_inventory_movements_sku_time
+  on inventory_movements(item_sku, created_at desc);
+
+create index if not exists idx_inventory_movements_order
+  on inventory_movements(order_sn);
+
+comment on table inventory_items is 'JAPANOVA 일본 실물재고 관리 설정. 현재고는 inventory_movements 합계로 계산한다.';
+comment on table inventory_movements is '재고 원장. 수동조정/입고/주문차감/취소복구를 기록하며 source_key로 중복 차감을 막는다.';
+
+-- 주문 동기화는 order_items를 매번 삭제 후 재삽입하므로 AFTER INSERT 트리거가
+-- 현재 주문상태를 확인해 최초 1회만 재고를 차감하거나 취소 시 1회 복구한다.
+create or replace function japanova_apply_order_inventory_movement()
+returns trigger
+language plpgsql
+as $$
+declare
+  v_sku text;
+  v_status text;
+  v_created timestamptz;
+  v_tracking timestamptz;
+  v_deduct_key text;
+  v_restore_key text;
+begin
+  v_sku := coalesce(nullif(btrim(new.item_sku),''), nullif(btrim(new.model_sku),''));
+  if v_sku is null then
+    return new;
+  end if;
+
+  select o.order_status, o.created_time_shopee
+    into v_status, v_created
+  from orders o
+  where o.order_sn=new.order_sn;
+
+  select i.tracking_started_at
+    into v_tracking
+  from inventory_items i
+  where i.item_sku=v_sku;
+
+  if v_tracking is null or v_created is null or v_created < v_tracking then
+    return new;
+  end if;
+
+  v_deduct_key := 'order:' || new.order_sn || ':deduct:' || v_sku || ':' || new.item_id || ':' || new.model_id;
+  v_restore_key := 'order:' || new.order_sn || ':restore:' || v_sku || ':' || new.item_id || ':' || new.model_id;
+
+  if v_status in ('READY_TO_SHIP','PROCESSED','SHIPPED','TO_CONFIRM_RECEIVE','COMPLETED') then
+    insert into inventory_movements(
+      item_sku, quantity_delta, movement_type, source_key, order_sn, note
+    )
+    values (
+      v_sku, -greatest(coalesce(new.quantity,1),1), 'ORDER_DEDUCT',
+      v_deduct_key, new.order_sn, 'Shopee 주문 자동 차감'
+    )
+    on conflict (source_key) do nothing;
+
+  elsif v_status='CANCELLED' then
+    if exists (
+      select 1 from inventory_movements
+      where source_key=v_deduct_key
+    ) then
+      insert into inventory_movements(
+        item_sku, quantity_delta, movement_type, source_key, order_sn, note
+      )
+      values (
+        v_sku, greatest(coalesce(new.quantity,1),1), 'ORDER_RESTORE',
+        v_restore_key, new.order_sn, 'Shopee 주문 취소 자동 복구'
+      )
+      on conflict (source_key) do nothing;
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_japanova_inventory_order_item on order_items;
+create trigger trg_japanova_inventory_order_item
+after insert on order_items
+for each row
+execute function japanova_apply_order_inventory_movement();
+
 insert into markets(code, name_ko, currency, active, future_market)
 values
   ('TW','대만','TWD',true,false),
