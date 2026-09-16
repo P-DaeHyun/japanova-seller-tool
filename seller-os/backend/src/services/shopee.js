@@ -1,16 +1,15 @@
 import crypto from 'node:crypto';
 
-const PARTNER_ID = Number(process.env.SHOPEE_PARTNER_ID || 0);
-const PARTNER_KEY = process.env.SHOPEE_PARTNER_KEY || '';
-const ENV = process.env.SHOPEE_ENV || 'sandbox';
-const REDIRECT_URI = process.env.SHOPEE_REDIRECT_URI || '';
+const PARTNER_ID = Number(String(process.env.SHOPEE_PARTNER_ID || '').trim() || 0);
+const RAW_PARTNER_KEY = process.env.SHOPEE_PARTNER_KEY || '';
+const PARTNER_KEY = String(RAW_PARTNER_KEY).trim();
+const ENV = String(process.env.SHOPEE_ENV || 'sandbox').trim();
+const REDIRECT_URI = String(process.env.SHOPEE_REDIRECT_URI || '').trim();
 
 const BASE_URL = ENV === 'production'
   ? 'https://partner.shopeemobile.com'
   : 'https://openplatform.sandbox.test-stable.shopee.sg';
 
-// Sandbox authorization uses the Sandbox Open Platform host as well.
-// Production authorization uses the production partner host.
 const AUTH_BASE_URL = ENV === 'production'
   ? 'https://partner.shopeemobile.com'
   : 'https://openplatform.sandbox.test-stable.shopee.sg';
@@ -57,9 +56,23 @@ function queryString(params) {
   return search.toString();
 }
 
+export function getShopeeConfigStatus() {
+  return {
+    environment: ENV,
+    partnerId: PARTNER_ID,
+    partnerKeyConfigured: Boolean(PARTNER_KEY),
+    partnerKeyLength: PARTNER_KEY.length,
+    partnerKeyHadOuterWhitespace: RAW_PARTNER_KEY !== PARTNER_KEY,
+    redirectUri: REDIRECT_URI,
+    apiBaseUrl: BASE_URL,
+    authBaseUrl: AUTH_BASE_URL
+  };
+}
+
 export function buildAuthorizationUrl({ redirectUri = REDIRECT_URI } = {}) {
   requireSecrets();
-  if (!redirectUri) {
+  const cleanRedirectUri = String(redirectUri || '').trim();
+  if (!cleanRedirectUri) {
     throw new Error('SHOPEE_REDIRECT_URI 환경변수가 필요합니다.');
   }
   const path = '/api/v2/shop/auth_partner';
@@ -68,7 +81,7 @@ export function buildAuthorizationUrl({ redirectUri = REDIRECT_URI } = {}) {
     partner_id: PARTNER_ID,
     timestamp,
     sign,
-    redirect: redirectUri
+    redirect: cleanRedirectUri
   });
   return `${AUTH_BASE_URL}${path}?${qs}`;
 }
