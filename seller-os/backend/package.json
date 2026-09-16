@@ -9,8 +9,9 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "migrate": "node src/migrate.js",
+    "bootstrap-sync": "node src/bootstrapSync.js",
     "start": "node src/server.js",
-    "start:render": "npm run migrate && node src/server.js"
+    "start:render": "npm run migrate && npm run bootstrap-sync && node src/server.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
