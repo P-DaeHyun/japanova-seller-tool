@@ -1,0 +1,45 @@
+name: Check JAPANOVA Seller OS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'seller-os/**'
+      - 'render.yaml'
+      - '.github/workflows/seller-os-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: seller-os/backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Check backend syntax
+        run: |
+          node --check src/server.js
+          node --check src/config.js
+          node --check src/db.js
+          node --check src/tokenCrypto.js
+          node --check src/migrate.js
+          node --check src/services/fx.js
+          node --check src/services/shopee.js
+          node --check src/services/sync.js
+
+      - name: Check frontend JavaScript syntax
+        run: node --check ../app.js
