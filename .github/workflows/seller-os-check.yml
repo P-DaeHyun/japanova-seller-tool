@@ -41,5 +41,17 @@ jobs:
           node --check src/services/shopee.js
           node --check src/services/sync.js
 
-      - name: Check frontend JavaScript syntax
+      - name: Check stable frontend JavaScript syntax
         run: node --check ../app.js
+
+      - name: Check v0.4 preview inline JavaScript syntax
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const html = fs.readFileSync('../v04.html', 'utf8');
+          const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)];
+          if (!scripts.length) throw new Error('v04.html에서 <script>를 찾지 못했습니다.');
+          fs.writeFileSync('/tmp/japanova-v04-inline.js', scripts.map((m) => m[1]).join('\n'));
+          NODE
+          node --check /tmp/japanova-v04-inline.js
