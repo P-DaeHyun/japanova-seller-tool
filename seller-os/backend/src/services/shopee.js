@@ -108,7 +108,11 @@ export async function getShopApi(path, { shopId, accessToken, params = {} }) {
     ...params
   });
   const response = await fetch(`${BASE_URL}${path}?${qs}`);
-  return parseShopeeResponse(response);
+  const data = await parseShopeeResponse(response);
+  if (data?.response && typeof data.response === 'object' && !Array.isArray(data.response)) {
+    return { ...data, ...data.response };
+  }
+  return data;
 }
 
 export async function getMerchantApi(path, { merchantId, accessToken, params = {} }) {
