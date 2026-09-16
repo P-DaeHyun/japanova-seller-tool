@@ -10,6 +10,7 @@ import {
   exchangeAuthorizationCode,
   getShopApi,
   postShopApi,
+  postShopApiFile,
   ShopeePaths
 } from './services/shopee.js';
 import {
@@ -62,13 +63,39 @@ function isPublicApiPath(req) {
     || req.path === '/shopee/authorize-url';
 }
 
-// Production 전환 때 SELLER_OS_API_KEY를 설정하면 운영 API가 자동으로 잠긴다.
-// 현재 Sandbox에서는 환경변수를 비워 기존 UI와 테스트 흐름을 그대로 유지한다.
 app.use('/api', (req, res, next) => {
   if (!sellerOsApiKey || isPublicApiPath(req)) return next();
   if (String(req.get('x-seller-os-key') || '') === sellerOsApiKey) return next();
   return res.status(401).json({ error: true, message: 'Seller OS API 인증이 필요합니다.' });
 });
+
+async function loadLogisticsOrder(orderSn) {
+  const result = await query(
+    `select order_sn, shop_id, market_code, order_status, shipping_carrier,
+            package_number, logistics_status, raw_json
+     from orders where order_sn=$1`,
+    [String(orderSn)]
+  );
+  return result.rows[0] || null;
+}
+
+function orderRef(order, { shippingDocumentType, trackingNumber } = {}) {
+  return {
+    order_sn: String(order.order_sn),
+    ...(order.package_number ? { package_number: String(order.package_number) } : {}),
+    ...(trackingNumber ? { tracking_number: String(trackingNumber) } : {}),
+    ...(shippingDocumentType ? { shipping_document_type: String(shippingDocumentType) } : {})
+  };
+}
+
+function extractTrackingNumber(data) {
+  const root = data?.response || data || {};
+  return root.tracking_number
+    || root.tracking_no
+    || root.first_mile_tracking_number
+    || root.last_mile_tracking_number
+    || null;
+}
 
 app.get('/api/health', async (_req, res) => {
   let db = '미설정';
@@ -82,7 +109,7 @@ app.get('/api/health', async (_req, res) => {
   }
   res.json({
     service: 'JAPANOVA Seller OS Backend',
-    version: '0.5.0',
+    version: '0.6.0',
     status: '정상',
     database: db,
     shopeeEnvironment: process.env.SHOPEE_ENV || 'sandbox',
@@ -328,26 +355,19 @@ app.post('/api/shopee/sync-all', async (req, res) => {
   }
 });
 
-// 출고 전에 Shopee가 허용하는 pickup/dropoff/non_integrated 옵션을 읽기 전용으로 조회한다.
 app.get('/api/shopee/shipping-parameter/:orderSn', async (req, res) => {
   if (!requireDb(res)) return;
   try {
-    const orderSn = String(req.params.orderSn);
-    const orderResult = await query(
-      `select order_sn, shop_id, market_code, order_status, shipping_carrier,
-              package_number, logistics_status
-       from orders where order_sn=$1`,
-      [orderSn]
-    );
-    if (!orderResult.rowCount) {
-      return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
-    }
-    const order = orderResult.rows[0];
+    const order = await loadLogisticsOrder(req.params.orderSn);
+    if (!order) return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
     const auth = await getValidAccessToken(Number(order.shop_id));
     const data = await getShopApi(ShopeePaths.shippingParameter, {
       shopId: Number(order.shop_id),
       accessToken: auth.accessToken,
-      params: { order_sn: orderSn }
+      params: {
+        order_sn: order.order_sn,
+        ...(order.package_number ? { package_number: order.package_number } : {})
+      }
     });
     return res.json({
       order: { ...order, order_status_ko: orderStatusKo(order.order_status) },
@@ -359,7 +379,6 @@ app.get('/api/shopee/shipping-parameter/:orderSn', async (req, res) => {
   }
 });
 
-// 실제 출고 호출. READY_TO_SHIP 주문만 허용하고 사용자가 method/payload를 명시해야 한다.
 app.post('/api/shopee/ship/:orderSn', async (req, res) => {
   if (!requireDb(res)) return;
   try {
@@ -368,14 +387,8 @@ app.post('/api/shopee/ship/:orderSn', async (req, res) => {
     if (!['pickup', 'dropoff', 'non_integrated'].includes(method)) {
       return res.status(400).json({ error: true, message: 'method는 pickup, dropoff, non_integrated 중 하나여야 합니다.' });
     }
-    const orderResult = await query(
-      `select order_sn, shop_id, market_code, order_status from orders where order_sn=$1`,
-      [orderSn]
-    );
-    if (!orderResult.rowCount) {
-      return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
-    }
-    const order = orderResult.rows[0];
+    const order = await loadLogisticsOrder(orderSn);
+    if (!order) return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
     if (order.order_status !== 'READY_TO_SHIP') {
       return res.status(409).json({
         error: true,
@@ -396,7 +409,11 @@ app.post('/api/shopee/ship/:orderSn', async (req, res) => {
     const data = await postShopApi(ShopeePaths.shipOrder, {
       shopId: Number(order.shop_id),
       accessToken: auth.accessToken,
-      body: { order_sn: orderSn, [method]: methodPayload }
+      body: {
+        order_sn: orderSn,
+        ...(order.package_number ? { package_number: order.package_number } : {}),
+        [method]: methodPayload
+      }
     });
     let sync = null;
     try {
@@ -411,6 +428,171 @@ app.post('/api/shopee/ship/:orderSn', async (req, res) => {
       response: data.response || data,
       orderResync: sync
     });
+  } catch (error) {
+    return res.status(502).json(safeError(error));
+  }
+});
+
+app.get('/api/shopee/tracking/:orderSn', async (req, res) => {
+  if (!requireDb(res)) return;
+  try {
+    const order = await loadLogisticsOrder(req.params.orderSn);
+    if (!order) return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
+    const auth = await getValidAccessToken(Number(order.shop_id));
+    const data = await getShopApi(ShopeePaths.trackingNumber, {
+      shopId: Number(order.shop_id),
+      accessToken: auth.accessToken,
+      params: {
+        order_sn: order.order_sn,
+        ...(order.package_number ? { package_number: order.package_number } : {}),
+        response_optional_fields: 'plp_number,first_mile_tracking_number,last_mile_tracking_number'
+      }
+    });
+    return res.json({
+      orderSn: order.order_sn,
+      packageNumber: order.package_number || null,
+      trackingNumber: extractTrackingNumber(data),
+      tracking: data.response || data
+    });
+  } catch (error) {
+    return res.status(502).json(safeError(error));
+  }
+});
+
+app.get('/api/shopee/shipping-document/parameter/:orderSn', async (req, res) => {
+  if (!requireDb(res)) return;
+  try {
+    const order = await loadLogisticsOrder(req.params.orderSn);
+    if (!order) return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
+    const auth = await getValidAccessToken(Number(order.shop_id));
+    const data = await postShopApi(ShopeePaths.shippingDocumentParameter, {
+      shopId: Number(order.shop_id),
+      accessToken: auth.accessToken,
+      body: { order_list: [orderRef(order)] }
+    });
+    return res.json({
+      orderSn: order.order_sn,
+      packageNumber: order.package_number || null,
+      parameter: data.response || data
+    });
+  } catch (error) {
+    return res.status(502).json(safeError(error));
+  }
+});
+
+app.post('/api/shopee/shipping-document/create/:orderSn', async (req, res) => {
+  if (!requireDb(res)) return;
+  try {
+    const order = await loadLogisticsOrder(req.params.orderSn);
+    if (!order) return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
+    const shippingDocumentType = String(req.body?.shippingDocumentType || '').trim();
+    if (!shippingDocumentType) {
+      return res.status(400).json({ error: true, message: 'shippingDocumentType이 필요합니다.' });
+    }
+    const auth = await getValidAccessToken(Number(order.shop_id));
+    let trackingNumber = String(req.body?.trackingNumber || '').trim() || null;
+    if (!trackingNumber) {
+      try {
+        const tracking = await getShopApi(ShopeePaths.trackingNumber, {
+          shopId: Number(order.shop_id),
+          accessToken: auth.accessToken,
+          params: {
+            order_sn: order.order_sn,
+            ...(order.package_number ? { package_number: order.package_number } : {})
+          }
+        });
+        trackingNumber = extractTrackingNumber(tracking);
+      } catch (error) {
+        console.warn('라벨 생성 전 Tracking Number 조회 실패:', error.message);
+      }
+    }
+    const data = await postShopApi(ShopeePaths.createShippingDocument, {
+      shopId: Number(order.shop_id),
+      accessToken: auth.accessToken,
+      body: {
+        order_list: [orderRef(order, { shippingDocumentType, trackingNumber })]
+      }
+    });
+    return res.json({
+      message: '배송라벨 생성 작업을 요청했습니다.',
+      orderSn: order.order_sn,
+      packageNumber: order.package_number || null,
+      shippingDocumentType,
+      trackingNumber,
+      response: data.response || data
+    });
+  } catch (error) {
+    return res.status(502).json(safeError(error));
+  }
+});
+
+app.get('/api/shopee/shipping-document/result/:orderSn', async (req, res) => {
+  if (!requireDb(res)) return;
+  try {
+    const order = await loadLogisticsOrder(req.params.orderSn);
+    if (!order) return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
+    const shippingDocumentType = String(req.query.type || '').trim();
+    const auth = await getValidAccessToken(Number(order.shop_id));
+    const data = await postShopApi(ShopeePaths.shippingDocumentResult, {
+      shopId: Number(order.shop_id),
+      accessToken: auth.accessToken,
+      body: {
+        order_list: [orderRef(order, {
+          shippingDocumentType: shippingDocumentType || undefined
+        })]
+      }
+    });
+    const result = data.response || data;
+    const first = Array.isArray(result.result_list) ? result.result_list[0] : null;
+    return res.json({
+      orderSn: order.order_sn,
+      packageNumber: order.package_number || null,
+      shippingDocumentType: shippingDocumentType || null,
+      status: first?.status || null,
+      result
+    });
+  } catch (error) {
+    return res.status(502).json(safeError(error));
+  }
+});
+
+app.get('/api/shopee/shipping-document/download/:orderSn', async (req, res) => {
+  if (!requireDb(res)) return;
+  try {
+    const order = await loadLogisticsOrder(req.params.orderSn);
+    if (!order) return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
+    const shippingDocumentType = String(req.query.type || '').trim();
+    if (!shippingDocumentType) {
+      return res.status(400).json({ error: true, message: 'type 쿼리값이 필요합니다.' });
+    }
+    const auth = await getValidAccessToken(Number(order.shop_id));
+    const ref = orderRef(order, { shippingDocumentType });
+    const statusData = await postShopApi(ShopeePaths.shippingDocumentResult, {
+      shopId: Number(order.shop_id),
+      accessToken: auth.accessToken,
+      body: { order_list: [ref] }
+    });
+    const statusRoot = statusData.response || statusData;
+    const first = Array.isArray(statusRoot.result_list) ? statusRoot.result_list[0] : null;
+    if (first?.status !== 'READY') {
+      return res.status(409).json({
+        error: true,
+        message: first?.status === 'FAILED'
+          ? `배송라벨 생성 실패: ${first.fail_message || first.fail_error || 'Shopee 오류'}`
+          : `배송라벨이 아직 준비되지 않았습니다. 현재 상태: ${first?.status || '확인 중'}`,
+        status: first?.status || null
+      });
+    }
+    const file = await postShopApiFile(ShopeePaths.downloadShippingDocument, {
+      shopId: Number(order.shop_id),
+      accessToken: auth.accessToken,
+      body: { order_list: [ref] }
+    });
+    const safeSn = String(order.order_sn).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filename = `JAPANOVA_${safeSn}_${shippingDocumentType}.pdf`;
+    res.setHeader('Content-Type', file.contentType || 'application/pdf');
+    res.setHeader('Content-Disposition', file.disposition || `attachment; filename="${filename}"`);
+    return res.send(file.bytes);
   } catch (error) {
     return res.status(502).json(safeError(error));
   }
