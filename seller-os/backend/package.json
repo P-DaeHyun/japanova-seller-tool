@@ -1,6 +1,6 @@
 {
   "name": "japanova-seller-os-backend",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -8,7 +8,9 @@
   },
   "scripts": {
     "dev": "node --watch src/server.js",
-    "start": "node src/server.js"
+    "migrate": "node src/migrate.js",
+    "start": "node src/server.js",
+    "start:render": "npm run migrate && node src/server.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
