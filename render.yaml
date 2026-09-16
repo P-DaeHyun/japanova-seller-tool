@@ -2,9 +2,9 @@ services:
   - type: web
     name: japanova-seller-os-api
     runtime: node
-    rootDir: seller-os/backend
-    buildCommand: npm install
-    startCommand: npm run start:render
+    rootDir: seller-os
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && npm run start:render
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:
