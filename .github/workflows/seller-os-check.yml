@@ -50,6 +50,7 @@ jobs:
         run: |
           node --check ../app.js
           node --check ../candidate-lab.js
+          node --check ../candidate-lab-v10.js
 
       - name: Check preview inline JavaScript syntax
         shell: bash
@@ -71,8 +72,13 @@ jobs:
           node --check /tmp/v07-inline.js
           node --check /tmp/v08-inline.js
 
-      - name: Check v0.9 document references
+      - name: Check pre-listing document references
         run: |
           test -f ../v09.html
           grep -q 'candidate-lab.js' ../v09.html
           grep -q 'margin-engine.js' ../v09.html
+          test -f ../v10.html
+          grep -q 'candidate-lab-v10.js' ../v10.html
+          grep -q 'margin-engine.js' ../v10.html
+          grep -q '최대 매입가능가' ../v10.html
+          grep -q '후보상품 비교판' ../v10.html
