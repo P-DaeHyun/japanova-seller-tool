@@ -10,6 +10,7 @@ import {
   syncProductList,
   syncSettlement
 } from './services/sync.js';
+import { getInventoryList, getInventorySummary } from './services/inventory.js';
 
 const enabled = String(process.env.BOOTSTRAP_SYNC_ON_START || '').trim().toLowerCase();
 const shouldRun = ['1', 'true', 'yes', 'on'].includes(enabled);
@@ -161,8 +162,23 @@ try {
       console.warn(`JAPANOVA 시작 동기화 실패 shop=${shopId}: ${error.message}`);
     }
   }
+
+  // 읽기 전용 self-check: 실제 재고 API가 사용하는 목록/요약 SQL을 서버 기동 전에 검증한다.
+  try {
+    const [inventory, summary] = await Promise.all([
+      getInventoryList(),
+      getInventorySummary()
+    ]);
+    console.log(
+      `JAPANOVA 재고 self-check 완료: rows=${inventory.length} tracked=${summary.trackedSkus} low=${summary.lowStockSkus} units=${summary.onHandUnits} reorder=${summary.reorderUnits}`
+    );
+  } catch (error) {
+    console.warn(`JAPANOVA 재고 self-check 실패: ${error.message}`);
+    throw error;
+  }
 } catch (error) {
   console.warn(`JAPANOVA 시작 동기화 전체 실패: ${error.message}`);
+  process.exitCode = 1;
 } finally {
   await pool.end();
 }
