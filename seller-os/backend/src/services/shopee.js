@@ -196,11 +196,29 @@ export async function exchangeAuthorizationCode({ code, shopId, mainAccountId })
     body: JSON.stringify(body)
   });
   const token = await parseShopeeResponse(response);
+
   if (mainAccountId) {
     try {
       await enrichMainAccountShopIds(token);
+
+      // Main Account 인증의 초기 토큰은 여러 Shop/Merchant에 공통으로 내려올 수 있다.
+      // Sandbox처럼 승인 Shop이 1개인 경우 즉시 Shop 전용 토큰으로 분리해서 저장한다.
+      const authorizedShopIds = Array.isArray(token.shop_id_list)
+        ? token.shop_id_list.map(Number).filter(Boolean)
+        : [];
+
+      if (authorizedShopIds.length === 1 && token.refresh_token) {
+        const scoped = await refreshAccessToken({
+          refreshToken: token.refresh_token,
+          shopId: authorizedShopIds[0]
+        });
+        token.access_token = scoped.access_token || token.access_token;
+        token.refresh_token = scoped.refresh_token || token.refresh_token;
+        token.expire_in = scoped.expire_in || token.expire_in;
+        token.scoped_shop_id = authorizedShopIds[0];
+      }
     } catch (error) {
-      console.warn('Main-account shop discovery failed:', error.message);
+      console.warn('Main-account shop discovery/token scoping failed:', error.message);
     }
   }
   return token;
