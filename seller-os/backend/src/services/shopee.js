@@ -142,6 +142,22 @@ export async function postShopApi(path, { shopId, accessToken, body = {} }) {
   return parseShopeeResponse(response);
 }
 
+/*
+ * Shopee Media API multipart 업로드.
+ * 상품 생성과 분리되어 있으며, 호출자가 파일 업로드를 명시적으로 요청한 경우에만 사용한다.
+ */
+export async function uploadShopImage({ shopId, accessToken, bytes, filename, contentType = 'image/jpeg' }) {
+  if (!bytes?.length) throw new Error('업로드할 이미지 파일이 비어 있습니다.');
+  const path = '/api/v2/media/upload_image';
+  const form = new FormData();
+  form.append('image', new Blob([bytes], { type: contentType }), filename || 'image.jpg');
+  const response = await fetch(shopSignedUrl(path, { shopId, accessToken }), {
+    method: 'POST',
+    body: form
+  });
+  return parseShopeeResponse(response);
+}
+
 // 배송라벨 다운로드 API는 성공 시 JSON이 아니라 waybill 파일을 반환한다.
 export async function postShopApiFile(path, { shopId, accessToken, body = {} }) {
   const response = await fetch(shopSignedUrl(path, { shopId, accessToken }), {
@@ -245,5 +261,10 @@ export const ShopeePaths = Object.freeze({
   createShippingDocument: '/api/v2/logistics/create_shipping_document',
   shippingDocumentResult: '/api/v2/logistics/get_shipping_document_result',
   downloadShippingDocument: '/api/v2/logistics/download_shipping_document',
-  shopListByMerchant: '/api/v2/merchant/get_shop_list_by_merchant'
+  shopListByMerchant: '/api/v2/merchant/get_shop_list_by_merchant',
+  category: '/api/v2/product/get_category',
+  attributeTree: '/api/v2/product/get_attribute_tree',
+  logisticsChannelList: '/api/v2/logistics/get_channel_list',
+  uploadImage: '/api/v2/media/upload_image',
+  addItem: '/api/v2/product/add_item'
 });
