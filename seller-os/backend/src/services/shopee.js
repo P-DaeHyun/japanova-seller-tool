@@ -3,10 +3,15 @@ import crypto from 'node:crypto';
 const PARTNER_ID = Number(process.env.SHOPEE_PARTNER_ID || 0);
 const PARTNER_KEY = process.env.SHOPEE_PARTNER_KEY || '';
 const ENV = process.env.SHOPEE_ENV || 'sandbox';
+const REDIRECT_URI = process.env.SHOPEE_REDIRECT_URI || '';
 
 const BASE_URL = ENV === 'production'
   ? 'https://partner.shopeemobile.com'
   : 'https://openplatform.sandbox.test-stable.shopee.sg';
+
+const AUTH_BASE_URL = ENV === 'production'
+  ? 'https://partner.shopeemobile.com'
+  : 'https://partner.test-stable.shopeemobile.com';
 
 function requireSecrets() {
   if (!PARTNER_ID || !PARTNER_KEY) {
@@ -48,6 +53,22 @@ function queryString(params) {
     search.set(key, String(value));
   }
   return search.toString();
+}
+
+export function buildAuthorizationUrl({ redirectUri = REDIRECT_URI } = {}) {
+  requireSecrets();
+  if (!redirectUri) {
+    throw new Error('SHOPEE_REDIRECT_URI 환경변수가 필요합니다.');
+  }
+  const path = '/api/v2/shop/auth_partner';
+  const { timestamp, sign } = signPublicApi(path);
+  const qs = queryString({
+    partner_id: PARTNER_ID,
+    timestamp,
+    sign,
+    redirect: redirectUri
+  });
+  return `${AUTH_BASE_URL}${path}?${qs}`;
 }
 
 async function parseShopeeResponse(response) {
