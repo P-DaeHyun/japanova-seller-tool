@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: japanova-seller-os-api
+    runtime: node
+    rootDir: seller-os/backend
+    buildCommand: npm install
+    startCommand: npm run start:render
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SHOPEE_ENV
+        value: production
+      - key: ALLOWED_ORIGIN
+        value: https://p-daehyun.github.io
+      - key: PAYONEER_RATE
+        value: "0.02"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: japanova-seller-os-db
+          property: connectionString
+      - key: TOKEN_ENCRYPTION_KEY
+        generateValue: true
+      - key: SHOPEE_PARTNER_ID
+        sync: false
+      - key: SHOPEE_PARTNER_KEY
+        sync: false
+      - key: SHOPEE_REDIRECT_URI
+        sync: false
+
+databases:
+  - name: japanova-seller-os-db
+    databaseName: japanova_seller_os
+    user: japanova
