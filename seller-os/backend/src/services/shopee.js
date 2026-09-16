@@ -111,6 +111,20 @@ export async function getShopApi(path, { shopId, accessToken, params = {} }) {
   return parseShopeeResponse(response);
 }
 
+export async function getMerchantApi(path, { merchantId, accessToken, params = {} }) {
+  const { timestamp, sign } = signMerchantApi(path, accessToken, merchantId);
+  const qs = queryString({
+    partner_id: PARTNER_ID,
+    timestamp,
+    access_token: accessToken,
+    merchant_id: merchantId,
+    sign,
+    ...params
+  });
+  const response = await fetch(`${BASE_URL}${path}?${qs}`);
+  return parseShopeeResponse(response);
+}
+
 export async function postShopApi(path, { shopId, accessToken, body = {} }) {
   const { timestamp, sign } = signShopApi(path, accessToken, shopId);
   const qs = queryString({
@@ -128,6 +142,41 @@ export async function postShopApi(path, { shopId, accessToken, body = {} }) {
   return parseShopeeResponse(response);
 }
 
+async function enrichMainAccountShopIds(token) {
+  const existingShopIds = Array.isArray(token.shop_id_list) ? token.shop_id_list : [];
+  if (existingShopIds.length > 0) return token;
+
+  const merchantIds = Array.isArray(token.merchant_id_list) ? token.merchant_id_list : [];
+  if (!merchantIds.length || !token.access_token) return token;
+
+  const discovered = new Set();
+  for (const merchantId of merchantIds) {
+    for (let pageNo = 1; pageNo <= 20; pageNo += 1) {
+      const data = await getMerchantApi('/api/v2/merchant/get_shop_list_by_merchant', {
+        merchantId: Number(merchantId),
+        accessToken: token.access_token,
+        params: { page_no: pageNo, page_size: 500 }
+      });
+      const shopList = Array.isArray(data.shop_list)
+        ? data.shop_list
+        : (Array.isArray(data.response?.shop_list) ? data.response.shop_list : []);
+      for (const row of shopList) {
+        if (row?.shop_id) discovered.add(Number(row.shop_id));
+        for (const affi of row?.sip_affi_shops || []) {
+          if (affi?.affi_shop_id) discovered.add(Number(affi.affi_shop_id));
+        }
+      }
+      const more = Boolean(data.more ?? data.response?.more);
+      if (!more || shopList.length === 0) break;
+    }
+  }
+
+  if (discovered.size > 0) {
+    token.shop_id_list = [...discovered];
+  }
+  return token;
+}
+
 export async function exchangeAuthorizationCode({ code, shopId, mainAccountId }) {
   const path = '/api/v2/auth/token/get';
   const { timestamp, sign } = signPublicApi(path);
@@ -142,7 +191,15 @@ export async function exchangeAuthorizationCode({ code, shopId, mainAccountId })
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
-  return parseShopeeResponse(response);
+  const token = await parseShopeeResponse(response);
+  if (mainAccountId) {
+    try {
+      await enrichMainAccountShopIds(token);
+    } catch (error) {
+      console.warn('Main-account shop discovery failed:', error.message);
+    }
+  }
+  return token;
 }
 
 export async function refreshAccessToken({ refreshToken, shopId, merchantId }) {
@@ -169,5 +226,6 @@ export const ShopeePaths = Object.freeze({
   orderDetail: '/api/v2/order/get_order_detail',
   escrowDetail: '/api/v2/payment/get_escrow_detail',
   shippingParameter: '/api/v2/logistics/get_shipping_parameter',
-  shipOrder: '/api/v2/logistics/ship_order'
+  shipOrder: '/api/v2/logistics/ship_order',
+  shopListByMerchant: '/api/v2/merchant/get_shop_list_by_merchant'
 });
