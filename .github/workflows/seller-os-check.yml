@@ -43,7 +43,9 @@ jobs:
           node --check src/services/sync.js
           node --check src/services/inventory.js
           node --check src/services/candidates.js
+          node --check src/services/marketResearch.js
           node --check src/routes/candidates.js
+          node --check src/routes/research.js
           test -f ../db/candidates.sql
 
       - name: Check stable frontend JavaScript syntax
@@ -51,6 +53,7 @@ jobs:
           node --check ../app.js
           node --check ../candidate-lab.js
           node --check ../candidate-lab-v10.js
+          node --check ../competitor-research.js
 
       - name: Check preview inline JavaScript syntax
         shell: bash
@@ -82,3 +85,7 @@ jobs:
           grep -q 'margin-engine.js' ../v10.html
           grep -q '최대 매입가능가' ../v10.html
           grep -q '후보상품 비교판' ../v10.html
+          test -f ../v11.html
+          grep -q 'competitor-research.js' ../v11.html
+          grep -q '경쟁상품 조사센터' ../v11.html
+          grep -q '대표 경쟁가' ../v11.html
