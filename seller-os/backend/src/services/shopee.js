@@ -9,9 +9,11 @@ const BASE_URL = ENV === 'production'
   ? 'https://partner.shopeemobile.com'
   : 'https://openplatform.sandbox.test-stable.shopee.sg';
 
+// Sandbox authorization uses the Sandbox Open Platform host as well.
+// Production authorization uses the production partner host.
 const AUTH_BASE_URL = ENV === 'production'
   ? 'https://partner.shopeemobile.com'
-  : 'https://partner.test-stable.shopeemobile.com';
+  : 'https://openplatform.sandbox.test-stable.shopee.sg';
 
 function requireSecrets() {
   if (!PARTNER_ID || !PARTNER_KEY) {
