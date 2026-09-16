@@ -10,11 +10,16 @@ if (!process.env.DATABASE_URL) {
 }
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const schemaPath = path.resolve(here, '../../db/schema.sql');
+const schemaPaths = [
+  path.resolve(here, '../../db/schema.sql'),
+  path.resolve(here, '../../db/candidates.sql')
+];
 
 try {
-  const sql = await fs.readFile(schemaPath, 'utf8');
-  await pool.query(sql);
+  for (const schemaPath of schemaPaths) {
+    const sql = await fs.readFile(schemaPath, 'utf8');
+    await pool.query(sql);
+  }
   console.log('JAPANOVA DB 스키마 적용 완료');
 } catch (error) {
   console.error('JAPANOVA DB 스키마 적용 실패:', error.message);
