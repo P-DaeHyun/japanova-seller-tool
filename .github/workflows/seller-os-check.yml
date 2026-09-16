@@ -44,7 +44,9 @@ jobs:
           node --check src/services/inventory.js
 
       - name: Check stable frontend JavaScript syntax
-        run: node --check ../app.js
+        run: |
+          node --check ../app.js
+          node --check ../candidate-lab.js
 
       - name: Check preview inline JavaScript syntax
         shell: bash
@@ -65,3 +67,9 @@ jobs:
           node --check /tmp/v06-inline.js
           node --check /tmp/v07-inline.js
           node --check /tmp/v08-inline.js
+
+      - name: Check v0.9 document references
+        run: |
+          test -f ../v09.html
+          grep -q 'candidate-lab.js' ../v09.html
+          grep -q 'margin-engine.js' ../v09.html
