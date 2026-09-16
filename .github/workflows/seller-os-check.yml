@@ -47,6 +47,8 @@ jobs:
           node --check src/routes/candidates.js
           node --check src/routes/research.js
           test -f ../db/candidates.sql
+          grep -q '"version": "1.3.0"' package.json
+          grep -q 'multer' package.json
 
       - name: Check stable frontend JavaScript syntax
         run: |
@@ -55,6 +57,7 @@ jobs:
           node --check ../candidate-lab-v10.js
           node --check ../competitor-research.js
           node --check ../listing-prep.js
+          node --check ../listing-prep-v13.js
 
       - name: Check preview inline JavaScript syntax
         shell: bash
@@ -93,6 +96,10 @@ jobs:
           test -f ../v12.html
           grep -q 'listing-prep.js' ../v12.html
           grep -q 'Shopee 등록 준비센터' ../v12.html
-          grep -q '실제 add_item은 아직 잠금' ../v12.html
-          grep -q "get_attribute_tree" src/routes/candidates.js
-          grep -q "get_channel_list" src/routes/candidates.js
+          test -f ../v13.html
+          grep -q 'listing-prep-v13.js' ../v13.html
+          grep -q '등록 직전 최종검사' ../v13.html
+          grep -q 'Shopee Media' ../v13.html
+          grep -q 'serverPreflight' ../listing-prep-v13.js
+          grep -q 'UPLOAD_IMAGE' src/routes/candidates.js
+          grep -q '/listing/preflight' src/routes/candidates.js
