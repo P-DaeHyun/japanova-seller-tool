@@ -1,7 +1,8 @@
 import 'dotenv/config';
 import { pool, query } from './db.js';
 import { MARKETS } from './config.js';
-import { getShopApi, ShopeePaths } from './services/shopee.js';
+import { decryptSecret, encryptSecret } from './tokenCrypto.js';
+import { getShopApi, refreshAccessToken, ShopeePaths } from './services/shopee.js';
 import {
   getValidAccessToken,
   syncOrders,
@@ -18,12 +19,77 @@ if (!process.env.DATABASE_URL || !shouldRun) {
   process.exit(0);
 }
 
+async function issueShopScopedToken(shopId) {
+  const saved = await query(
+    `select refresh_token_encrypted from shopee_connections where shop_id=$1`,
+    [shopId]
+  );
+  if (!saved.rowCount || !saved.rows[0].refresh_token_encrypted) {
+    throw new Error('Shop 전용 Access Token 발급에 필요한 Refresh Token이 없습니다.');
+  }
+
+  const currentRefreshToken = decryptSecret(saved.rows[0].refresh_token_encrypted);
+  const token = await refreshAccessToken({
+    refreshToken: currentRefreshToken,
+    shopId
+  });
+
+  if (!token.access_token) {
+    throw new Error('Shopee가 Shop 전용 Access Token을 반환하지 않았습니다.');
+  }
+
+  const nextRefreshToken = token.refresh_token || currentRefreshToken;
+  const accessExpiresAt = new Date(Date.now() + Number(token.expire_in || 14400) * 1000);
+  const refreshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+  await query(
+    `update shopee_connections
+     set access_token_encrypted=$2,
+         refresh_token_encrypted=$3,
+         access_token_expires_at=$4,
+         refresh_token_expires_at=$5,
+         status='CONNECTED',
+         updated_at=now()
+     where shop_id=$1`,
+    [
+      shopId,
+      encryptSecret(token.access_token),
+      encryptSecret(nextRefreshToken),
+      accessExpiresAt,
+      refreshExpiresAt
+    ]
+  );
+
+  console.log(`JAPANOVA Shop 전용 토큰 발급 완료: ${shopId}`);
+  return token.access_token;
+}
+
+function isInvalidAccessToken(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return message.includes('invalid_access_token') || message.includes('invalid_acceess_token');
+}
+
 async function hydrateShopConnection(shopId) {
   const auth = await getValidAccessToken(shopId);
-  const raw = await getShopApi(ShopeePaths.shopInfo, {
-    shopId,
-    accessToken: auth.accessToken
-  });
+  let accessToken = auth.accessToken;
+  let raw;
+
+  try {
+    raw = await getShopApi(ShopeePaths.shopInfo, {
+      shopId,
+      accessToken
+    });
+  } catch (error) {
+    if (!isInvalidAccessToken(error)) throw error;
+
+    console.warn(`JAPANOVA 공용 토큰 감지, Shop 전용 토큰으로 전환: ${shopId}`);
+    accessToken = await issueShopScopedToken(shopId);
+    raw = await getShopApi(ShopeePaths.shopInfo, {
+      shopId,
+      accessToken
+    });
+  }
+
   const info = raw?.response && typeof raw.response === 'object' ? raw.response : raw;
   const marketCode = info?.region && MARKETS[info.region] ? info.region : null;
 
@@ -43,7 +109,7 @@ async function hydrateShopConnection(shopId) {
   );
 
   return {
-    accessToken: auth.accessToken,
+    accessToken,
     marketCode,
     shopName: info?.shop_name || null,
     merchantId: info?.merchant_id ? Number(info.merchant_id) : null
