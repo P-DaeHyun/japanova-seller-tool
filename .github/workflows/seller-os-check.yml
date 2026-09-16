@@ -33,6 +33,7 @@ jobs:
       - name: Check backend syntax
         run: |
           node --check src/server.js
+          node --check src/bootstrapSync.js
           node --check src/config.js
           node --check src/db.js
           node --check src/tokenCrypto.js
