@@ -56,6 +56,19 @@ function queryString(params) {
   return search.toString();
 }
 
+function shopSignedUrl(path, { shopId, accessToken, params = {} }) {
+  const { timestamp, sign } = signShopApi(path, accessToken, shopId);
+  const qs = queryString({
+    partner_id: PARTNER_ID,
+    timestamp,
+    access_token: accessToken,
+    shop_id: shopId,
+    sign,
+    ...params
+  });
+  return `${BASE_URL}${path}?${qs}`;
+}
+
 export function getShopeeConfigStatus() {
   return {
     environment: ENV,
@@ -98,16 +111,7 @@ async function parseShopeeResponse(response) {
 }
 
 export async function getShopApi(path, { shopId, accessToken, params = {} }) {
-  const { timestamp, sign } = signShopApi(path, accessToken, shopId);
-  const qs = queryString({
-    partner_id: PARTNER_ID,
-    timestamp,
-    access_token: accessToken,
-    shop_id: shopId,
-    sign,
-    ...params
-  });
-  const response = await fetch(`${BASE_URL}${path}?${qs}`);
+  const response = await fetch(shopSignedUrl(path, { shopId, accessToken, params }));
   const data = await parseShopeeResponse(response);
   if (data?.response && typeof data.response === 'object' && !Array.isArray(data.response)) {
     return { ...data, ...data.response };
@@ -130,20 +134,42 @@ export async function getMerchantApi(path, { merchantId, accessToken, params = {
 }
 
 export async function postShopApi(path, { shopId, accessToken, body = {} }) {
-  const { timestamp, sign } = signShopApi(path, accessToken, shopId);
-  const qs = queryString({
-    partner_id: PARTNER_ID,
-    timestamp,
-    access_token: accessToken,
-    shop_id: shopId,
-    sign
-  });
-  const response = await fetch(`${BASE_URL}${path}?${qs}`, {
+  const response = await fetch(shopSignedUrl(path, { shopId, accessToken }), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
   return parseShopeeResponse(response);
+}
+
+// 배송라벨 다운로드 API는 성공 시 JSON이 아니라 waybill 파일을 반환한다.
+export async function postShopApiFile(path, { shopId, accessToken, body = {} }) {
+  const response = await fetch(shopSignedUrl(path, { shopId, accessToken }), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const contentType = String(response.headers.get('content-type') || 'application/octet-stream');
+  const disposition = String(response.headers.get('content-disposition') || '');
+
+  if (!response.ok || contentType.includes('application/json')) {
+    const text = await response.text();
+    let parsed = null;
+    try { parsed = JSON.parse(text); } catch {}
+    if (parsed?.error) {
+      throw new Error(`Shopee API 오류 ${parsed.error}: ${parsed.message || ''}`.trim());
+    }
+    if (!response.ok) {
+      throw new Error(`Shopee HTTP ${response.status}: ${text.slice(0, 1000)}`);
+    }
+    throw new Error(parsed?.message || 'Shopee가 배송라벨 파일 대신 JSON 응답을 반환했습니다.');
+  }
+
+  return {
+    bytes: Buffer.from(await response.arrayBuffer()),
+    contentType,
+    disposition
+  };
 }
 
 export async function exchangeAuthorizationCode({ code, shopId, mainAccountId }) {
@@ -214,5 +240,10 @@ export const ShopeePaths = Object.freeze({
   escrowDetail: '/api/v2/payment/get_escrow_detail',
   shippingParameter: '/api/v2/logistics/get_shipping_parameter',
   shipOrder: '/api/v2/logistics/ship_order',
+  trackingNumber: '/api/v2/logistics/get_tracking_number',
+  shippingDocumentParameter: '/api/v2/logistics/get_shipping_document_parameter',
+  createShippingDocument: '/api/v2/logistics/create_shipping_document',
+  shippingDocumentResult: '/api/v2/logistics/get_shipping_document_result',
+  downloadShippingDocument: '/api/v2/logistics/download_shipping_document',
   shopListByMerchant: '/api/v2/merchant/get_shop_list_by_merchant'
 });
