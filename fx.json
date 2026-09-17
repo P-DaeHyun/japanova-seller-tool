@@ -1,1 +1,24 @@
-{"fxVersion":"2026.09.15","updatedAt":"2026-09-15T15:15:00+09:00","source":"JAPANOVA managed snapshot","jpyPer":{"TWD":4.867,"SGD":121.551,"MYR":37.8917,"THB":4.6498,"PHP":2.4572,"VND":0.006}}
+{
+  "fxVersion": "2026.09.17",
+  "updatedAt": "2026-09-17T09:35:15+09:00",
+  "lastAttemptAt": "2026-09-17T09:35:15+09:00",
+  "source": "Frankfurter v2 via GitHub Actions",
+  "sourceDate": "2026-09-16",
+  "status": "ok",
+  "warnings": [],
+  "providers": {
+    "primary": "Frankfurter v2",
+    "fallback": "ExchangeRate-API Open",
+    "fallbackAttribution": "https://www.exchangerate-api.com"
+  },
+  "fxBufferDefault": 0.02,
+  "jpyPer": {
+    "TWD": 4.878762745767673,
+    "SGD": 121.8026796589525,
+    "MYR": 37.9794910748196,
+    "THB": 4.662874195654201,
+    "PHP": 2.471760140395976,
+    "VND": 0.005989099838294304,
+    "BRL": 30.129557095510698
+  }
+}
