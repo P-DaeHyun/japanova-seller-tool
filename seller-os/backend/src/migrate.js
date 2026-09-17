@@ -12,7 +12,8 @@ if (!process.env.DATABASE_URL) {
 const here = path.dirname(fileURLToPath(import.meta.url));
 const schemaPaths = [
   path.resolve(here, '../../db/schema.sql'),
-  path.resolve(here, '../../db/candidates.sql')
+  path.resolve(here, '../../db/candidates.sql'),
+  path.resolve(here, '../../db/listing-publish.sql')
 ];
 
 try {
