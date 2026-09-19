@@ -1,0 +1,39 @@
+/* JAPANOVA v5.12 — product types, variants, bundles */
+.sale-type-chooser{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.sale-type-card{display:flex;align-items:flex-start;gap:9px;padding:11px 12px;border:1px solid #dfe6eb;border-radius:12px;background:#fbfcfd;cursor:pointer}
+.sale-type-card:has(input:checked){border-color:#6fb29e;background:#f0faf7;box-shadow:0 0 0 2px rgba(79,178,151,.08)}
+.sale-type-card input{margin-top:2px;accent-color:#2fa984}
+.sale-type-card strong{display:block;color:#314358;font-size:11px}
+.sale-type-card small{display:block;margin-top:3px;color:#8d9aaa;font-size:9px;line-height:1.45}
+.product-dynamic-section{margin-top:12px;padding:13px;border:1px solid #e2e8ed;border-radius:13px;background:#fafcfd}
+.dynamic-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.dynamic-head h5{margin:0;color:#304258;font-size:11px}.dynamic-head span{color:#8c99a8;font-size:9px}
+.variant-config{display:grid;grid-template-columns:.7fr 1.3fr .7fr 1.3fr auto;gap:8px;align-items:end}
+.variant-config label,.bundle-extra-grid label{display:block;color:#536276;font-size:9.5px;font-weight:800}
+.variant-config input,.variant-config textarea,.bundle-extra-grid input{width:100%;margin-top:5px;border:1px solid #dbe3e9;background:#fff;color:#2d3e51;border-radius:9px;padding:9px 10px;font:inherit;font-size:11px;outline:none}
+.variant-config textarea{min-height:62px;resize:vertical}
+.variant-config input:focus,.variant-config textarea:focus,.bundle-extra-grid input:focus{border-color:#73b39f;box-shadow:0 0 0 3px rgba(79,178,151,.08)}
+.type-action{border:1px solid #cad8df;background:#fff;color:#395267;border-radius:9px;padding:9px 11px;font-size:10px;font-weight:850;cursor:pointer}
+.type-action.primary{background:#17324c;color:#fff;border-color:#17324c}.type-action.danger{color:#a34d4d}
+.variant-table-wrap,.bundle-table-wrap{overflow:auto;margin-top:10px;border:1px solid #e3e8ed;border-radius:11px;background:#fff}
+.variant-table,.bundle-table{width:100%;border-collapse:collapse;min-width:760px}
+.variant-table th,.bundle-table th{padding:8px 9px;background:#f5f8fa;border-bottom:1px solid #e4e9ed;text-align:left;color:#7c8999;font-size:9px}
+.variant-table td,.bundle-table td{padding:8px 9px;border-bottom:1px solid #edf1f4;color:#4d5d70;font-size:10px;vertical-align:middle}
+.variant-table tr:last-child td,.bundle-table tr:last-child td{border-bottom:0}
+.variant-table input,.bundle-table input,.bundle-table select{width:100%;border:1px solid #dce4e9;background:#fbfcfd;color:#304256;border-radius:8px;padding:7px 8px;font:inherit;font-size:10px}
+.variant-code{font-weight:900;color:#2f485f;white-space:nowrap}
+.variant-option{font-weight:800;color:#35495f}
+.type-summary{margin-top:9px;padding:9px 10px;border-radius:9px;background:#f1f7f5;color:#547067;font-size:9.5px;line-height:1.55}
+.type-summary strong{color:#276552}
+.bundle-extra-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.bundle-product-select{min-width:320px}
+.market-variant-wrap{margin-top:10px;border:1px solid #e2e8ed;border-radius:11px;overflow:auto}
+.market-variant-table{width:100%;min-width:760px;border-collapse:collapse}
+.market-variant-table th{padding:8px;background:#f6f8fa;color:#788697;font-size:9px;text-align:left;border-bottom:1px solid #e4e9ed}
+.market-variant-table td{padding:8px;border-bottom:1px solid #edf1f4;font-size:10px;color:#536276}
+.market-variant-table tr:last-child td{border-bottom:0}
+.market-variant-table input{width:100%;border:1px solid #dce4e9;background:#fbfcfd;border-radius:8px;padding:7px 8px;font:inherit;font-size:10px;color:#304256}
+.product-type-badge{display:inline-flex;margin-left:5px;padding:2px 5px;border-radius:999px;background:#edf5f2;color:#39735f;font-size:8px;font-weight:900;vertical-align:1px}
+.readonly-derived{background:#f2f5f7!important;color:#6f7c8a!important}
+@media(max-width:900px){.sale-type-chooser{grid-template-columns:1fr}.variant-config{grid-template-columns:1fr 1fr}.variant-config .type-action{grid-column:span 2}.bundle-extra-grid{grid-template-columns:1fr}}
+@media(max-width:650px){.variant-config{grid-template-columns:1fr}.variant-config .type-action{grid-column:span 1}.bundle-product-select{min-width:230px}}
