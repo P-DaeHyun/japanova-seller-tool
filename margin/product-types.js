@@ -107,10 +107,10 @@
     });
     return rows;
   }
-  function syncTypeEditorV512(){
+  function syncTypeEditorV512(forceType){
     if(!editingProduct) return;
     editingProduct = normalizeProductV512(editingProduct);
-    editingProduct.saleType = currentTypeV512();
+    editingProduct.saleType = forceType || currentTypeV512();
     if(editingProduct.saleType === 'variant'){
       editingProduct.optionDefinition = {
         name1:($('pOption1Name') && $('pOption1Name').value.trim()) || '',
@@ -424,7 +424,8 @@
   var chooser = $('saleTypeChooser');
   if(chooser) chooser.addEventListener('change',function(e){
     if(!e.target.matches('input[name="saleType"]'))return;
-    syncTypeEditorV512();editingProduct.saleType=e.target.value;renderProductTypeEditorV512();
+    var previousType = editingProduct ? saleTypeOf(editingProduct) : 'single';
+    syncTypeEditorV512(previousType);editingProduct.saleType=e.target.value;renderProductTypeEditorV512();
   });
   if($('generateVariants')) $('generateVariants').addEventListener('click',generateVariantsV512);
   if($('variantRows')) {
