@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<title>JAPANOVA · Shopee 6 Markets</title>
+<style>
+:root{--bg:#07111f;--card:#0f1b2d;--line:#23334d;--text:#f8fafc;--muted:#9fb0c8;--orange:#ee4d2d}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:linear-gradient(180deg,#07111f 0%,#0a1628 100%);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;color:var(--text)}
+body{padding:max(24px,env(safe-area-inset-top)) 18px max(28px,env(safe-area-inset-bottom))}
+.wrap{max-width:560px;margin:0 auto}
+.brand{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.logo{width:46px;height:46px;border-radius:14px;background:var(--orange);display:grid;place-items:center;font-size:24px;font-weight:900;box-shadow:0 8px 26px rgba(238,77,45,.25)}
+h1{font-size:24px;line-height:1.2;margin:0;font-weight:850;letter-spacing:-.5px}
+.sub{margin:0 0 22px 58px;color:var(--muted);font-size:13px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+a.market{display:flex;align-items:center;gap:12px;min-height:86px;padding:16px;border-radius:18px;background:rgba(15,27,45,.92);border:1px solid var(--line);color:var(--text);text-decoration:none;box-shadow:0 10px 28px rgba(0,0,0,.18);transition:.15s transform,.15s border-color,.15s background}
+a.market:active{transform:scale(.98);background:#13223a;border-color:#355078}
+.flag{font-size:32px;line-height:1}
+.name{font-size:16px;font-weight:800;letter-spacing:-.2px}
+.code{margin-top:4px;font-size:12px;color:var(--muted)}
+.tip{margin-top:18px;padding:15px 16px;border-radius:16px;background:rgba(255,255,255,.045);border:1px solid var(--line);color:#d8e1ef;font-size:13px;line-height:1.6}
+.tip b{color:white}
+.foot{margin-top:16px;text-align:center;color:#6f819d;font-size:11px}
+@media(max-width:390px){.grid{grid-template-columns:1fr}.sub{margin-left:0;margin-top:8px}.brand{align-items:flex-start}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div class="brand">
+    <div class="logo">S</div>
+    <div><h1>JAPANOVA · Shopee 6 Markets</h1></div>
+  </div>
+  <p class="sub">국가를 누르면 해당 Shopee 웹사이트가 새 탭에서 열려.</p>
+
+  <section class="grid" aria-label="Shopee 국가 바로가기">
+    <a class="market" href="https://shopee.tw/" target="_blank" rel="noopener noreferrer"><span class="flag">🇹🇼</span><span><div class="name">대만</div><div class="code">Shopee TW</div></span></a>
+    <a class="market" href="https://shopee.ph/" target="_blank" rel="noopener noreferrer"><span class="flag">🇵🇭</span><span><div class="name">필리핀</div><div class="code">Shopee PH</div></span></a>
+    <a class="market" href="https://shopee.sg/" target="_blank" rel="noopener noreferrer"><span class="flag">🇸🇬</span><span><div class="name">싱가포르</div><div class="code">Shopee SG</div></span></a>
+    <a class="market" href="https://shopee.com.my/" target="_blank" rel="noopener noreferrer"><span class="flag">🇲🇾</span><span><div class="name">말레이시아</div><div class="code">Shopee MY</div></span></a>
+    <a class="market" href="https://shopee.vn/" target="_blank" rel="noopener noreferrer"><span class="flag">🇻🇳</span><span><div class="name">베트남</div><div class="code">Shopee VN</div></span></a>
+    <a class="market" href="https://shopee.co.th/" target="_blank" rel="noopener noreferrer"><span class="flag">🇹🇭</span><span><div class="name">태국</div><div class="code">Shopee TH</div></span></a>
+  </section>
+
+  <div class="tip"><b>Chrome 번역</b><br>국가 Shopee를 연 뒤 Chrome 메뉴 <b>⋯ → 번역 → 한국어</b>를 선택하면 돼.<br><b>홈 화면 추가</b>해두면 이 페이지 하나로 6개국을 바로 이동할 수 있어.</div>
+  <div class="foot">JAPANOVA · Shopee Market Launcher</div>
+</main>
+</body>
+</html>
