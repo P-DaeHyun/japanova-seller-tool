@@ -8,11 +8,15 @@ const REDIRECT_URI = String(process.env.SHOPEE_REDIRECT_URI || '').trim();
 
 const BASE_URL = ENV === 'production'
   ? 'https://partner.shopeemobile.com'
-  : 'https://openplatform.sandbox.test-stable.shopee.sg';
+  : ENV === 'sandbox_cn'
+    ? 'https://openplatform.test-stable.shopee.cn'
+    : 'https://partner.test-stable.shopeemobile.com';
 
 const AUTH_BASE_URL = ENV === 'production'
-  ? 'https://open.shopee.com'
-  : 'https://open.sandbox.test-stable.shopee.com';
+  ? 'https://partner.shopeemobile.com'
+  : ENV === 'sandbox_cn'
+    ? 'https://openplatform.test-stable.shopee.cn'
+    : 'https://partner.test-stable.shopeemobile.com';
 
 function requireSecrets() {
   if (!PARTNER_ID || !PARTNER_KEY) {
