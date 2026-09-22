@@ -172,6 +172,18 @@ async function load(){
   const ready=state.candidates.find(c=>c.status==='READY');state.selectedId=(ready||state.candidates[0]||{}).id||null;
   renderAll();
 }
+async function seedSandboxCandidate(){
+  if(state.busy)return;
+  if(state.listingStatus.environment!=='sandbox')return flash('Sandbox 환경에서만 테스트 후보를 만들 수 있어.','warn');
+  state.busy=true;
+  try{
+    const r=await api('/api/candidates/listing/sandbox-test-candidate',{method:'POST'});
+    flash(r.message||'Sandbox 테스트 후보를 준비했어.');
+    await load();
+    if(r.candidate?.id){state.selectedId=r.candidate.id;state.market='TW';renderAll()}
+  }catch(e){flash(e.message,'bad')}finally{state.busy=false}
+}
+
 async function saveCandidate(c,{quiet=false}={}){
   const r=await api(`/api/candidates/${encodeURIComponent(c.id)}`,{method:'PUT',body:c});
   const saved=r.candidate||c;const i=state.candidates.findIndex(x=>x.id===saved.id);if(i>=0)state.candidates[i]=saved;
@@ -196,6 +208,7 @@ function renderHeader(){
   const publishLabel=sandboxOn?'Sandbox add_item ON':state.listingStatus.productionPublishEnabled?'Production add_item ON':'add_item 잠금';
   $('#apiStatus').textContent=`${env} · 연결 Shop ${conns} · ${publishLabel}`;
   $('#apiStatus').className=`badge ${conns?(sandboxOn?'warn':'ok'):'warn'}`;
+  if($('#seedSandbox')) $('#seedSandbox').disabled=env!=='sandbox';
 }
 function renderMarketTabs(){
   const c=candidate();$('#marketTabs').innerHTML=MARKETS.map(m=>{const d=c?draft(c,m.code):null;const r=c?clientReadiness(c,m.code):null;let label='대기';if(d?.preflight?.ready)label='최종검사 통과';else if(r?.ready)label='검사 가능';else if(d?.enabled)label='작성중';return `<button class="marketTab ${state.market===m.code?'on':''}" data-market="${m.code}">${m.name}<small>${label}${m.future?' · 향후':''}</small></button>`}).join('');
@@ -369,6 +382,7 @@ function renderSummary(){
 function renderAll(){renderMetrics();renderCandidateSelect();renderHeader();renderMarketTabs();renderEditor();renderSummary()}
 
 $('#candidateSelect').onchange=e=>{state.selectedId=e.target.value;renderAll()};
+$('#seedSandbox').onclick=()=>seedSandboxCandidate();
 $('#exportAll').onclick=()=>{const c=candidate();if(!c)return;saveBlob(`japanova-${c.id}-all-listing-packages.json`,{schema:'JAPANOVA_LISTING_BUNDLE_V2',generatedAt:now(),candidateId:c.id,candidateName:c.name,packages:Object.fromEntries(MARKETS.map(m=>[m.code,buildPackage(c,m.code)]))})};
 $('#navResearch').onclick=()=>location.href='./v11.html';$('#navValidation').onclick=()=>location.href='./v10.html';$('#navOps').onclick=()=>location.href='./v08.html';
 
