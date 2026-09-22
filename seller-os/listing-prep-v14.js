@@ -239,7 +239,7 @@ function renderHeader(){
 }
 function renderMarketTabs(){
   const c=candidate();$('#marketTabs').innerHTML=MARKETS.map(m=>{const d=c?draft(c,m.code):null;const r=c?clientReadiness(c,m.code):null;let label='대기';if(d?.preflight?.ready)label='최종검사 통과';else if(r?.ready)label='검사 가능';else if(d?.enabled)label='작성중';return `<button class="marketTab ${state.market===m.code?'on':''}" data-market="${m.code}">${m.name}<small>${label}${m.future?' · 향후':''}</small></button>`}).join('');
-  $('#marketTabs [data-market]').forEach(b=>b.onclick=async()=>{state.market=b.dataset.market;renderMarketTabs();renderEditor();renderSummary();const c=candidate();if(c){await loadPublishAttempt(c,state.market);renderAll()}});
+  $$('#marketTabs [data-market]').forEach(b=>b.onclick=async()=>{state.market=b.dataset.market;renderMarketTabs();renderEditor();renderSummary();const c=candidate();if(c){await loadPublishAttempt(c,state.market);renderAll()}});
 }
 function renderAttributeFields(d){
   const metadata=state.attributeCache[attrCacheKey(d)]||[];
