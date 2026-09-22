@@ -79,6 +79,7 @@ function applyDefaults(c,code){
   const d=draft(c,code);
   if(!d.title)d.title=c.name||'';
   if(!d.description)d.description=defaultDescription(c,code);
+  if(c.id==='SANDBOX-TEST-TW' && code==='SG' && String(d.description).trim().length>200)d.description='JAPANOVA Sandbox test item. API listing test only. Not for real sale.';
   return d;
 }
 function touch(d){d.updatedAt=now();d.preflight=null;}
@@ -138,7 +139,9 @@ function clientReadiness(c,code){
   if(!d.enabled)blocks.push('등록 준비 스위치가 꺼져 있어.');
   if(!String(d.title||'').trim())blocks.push('상품명이 비어 있어.');
   if(String(d.title||'').trim().length>120)blocks.push('상품명이 120자를 넘었어.');
-  if(!String(d.description||'').trim())blocks.push('상세설명이 비어 있어.');
+  const descriptionText=String(d.description||'').trim();
+  if(!descriptionText)blocks.push('상세설명이 비어 있어.');
+  if(state.listingStatus.environment==='sandbox' && descriptionText.length>200)blocks.push(`Sandbox 상세설명은 200자 이하여야 해. 현재 ${descriptionText.length}자야.`);
   if(!String(d.sku||'').trim())blocks.push('SKU가 비어 있어.');
   if(!(Number(d.priceLocal)>0))blocks.push(`판매가(${m.cur})가 필요해.`);
   if(!(Number(d.initialStock)>0))blocks.push('등록재고가 1개 이상이어야 해.');
@@ -316,7 +319,7 @@ function renderEditor(){
         <label>가로 cm<input id="length" class="input" type="number" step="any" min="0" value="${esc(d.lengthCm||'')}"></label><label>세로 cm<input id="width" class="input" type="number" step="any" min="0" value="${esc(d.widthCm||'')}"></label>
         <label>높이 cm<input id="height" class="input" type="number" step="any" min="0" value="${esc(d.heightCm||'')}"></label><label>브랜드 상태<input class="input" value="${esc(d.brandName|| (d.brandMandatory?'선택 필요':'미선택'))}" disabled></label>
         <label class="full">GTIN / JAN / EAN<input id="gtin" class="input" value="${esc(d.gtin||'')}"></label>
-        <label class="full">상세설명<textarea id="description">${esc(d.description)}</textarea></label>
+        <label class="full">상세설명<textarea id="description" maxlength="${state.listingStatus.environment==='sandbox'?200:5000}">${esc(d.description)}</textarea><span class="tiny">Sandbox: 1~200자 · 현재 ${String(d.description||'').trim().length}자</span></label>
       </div></section>
       <section class="cardInner"><h3>2. Shop · 카테고리</h3><div class="form">
         <label class="full">등록 대상 Shop<select id="shop" class="select"><option value="">선택</option>${conns.map(x=>`<option value="${x.shopId}" ${Number(d.selectedShopId)===Number(x.shopId)?'selected':''}>${esc(x.shopName||'Shop')} · ${x.shopId}</option>`).join('')}</select></label>
