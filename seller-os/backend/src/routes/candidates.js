@@ -408,7 +408,7 @@ router.get('/listing/attributes', async (req, res) => {
     const data = await getShopApi('/api/v2/product/get_attribute_tree', {
       shopId,
       accessToken: auth.accessToken,
-      params: { category_ids: String(categoryId), language: String(req.query.language || 'en').slice(0, 20) }
+      params: { category_id_list: String(categoryId), language: String(req.query.language || 'en').slice(0, 20) }
     });
     const attributeList = extractAttributeList(data, categoryId);
     res.json({ shop, categoryId, tokenRefreshed: auth.refreshed, attributeList, mandatoryAttributes: attributeList.filter(isMandatoryAttribute), raw: data.response || data });
