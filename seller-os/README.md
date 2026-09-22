@@ -221,7 +221,8 @@ Shopee 정산은 한 필드만 보지 않고 주문별 Escrow 상세를 저장�
 - 카테고리/필수속성/물류 조회
 - Shopee Media 이미지 업로드
 - 서버 등록 직전 최종검사
-- 실제 `add_item`은 Production 안전장치 완성 전까지 잠금
+- Sandbox 환경에서는 서버 최종검사 통과 후 `add_item`으로 UNLIST 테스트 상품 생성 가능
+- Production `add_item`은 별도 안전스위치가 켜지기 전까지 계속 잠금
 
 ### Phase 6 — 확장
 
@@ -250,7 +251,8 @@ Shopee 정산은 한 필드만 보지 않고 주문별 Escrow 상세를 저장�
 → 물류 채널 선택
 → Shopee Media 이미지 업로드
 → 서버 최종검사
-→ 향후 안전확인 후 add_item
+→ Sandbox: 명시적 확인 후 UNLIST add_item 테스트
+→ Production: 안전스위치 OFF 유지
 ```
 
 ### 상품 등록 후
@@ -277,6 +279,7 @@ Shopee 상품
 - 업로드 결과 `image_id`를 국가별 등록 초안에 저장
 - 브라우저 기본검사 후 서버가 DB 초안을 다시 읽어 Shopee 현재 메타데이터와 비교
 - 서버 최종검사에서 차단 사유와 경고를 분리 표시
-- `add_item` 상품 생성 mutation은 항상 잠금 상태 유지
+- Sandbox `add_item`은 명시적 확인문구 + 서버 안전스위치 + 중복등록 방지 원장을 모두 통과해야 실행
+- Production `add_item`은 별도 안전스위치 없이는 실행 불가
 
-최종검사가 통과해도 현재 버전에서는 Shopee 상품이 자동 생성되지 않는다.
+v1.4에서는 Sandbox에 한해 최종검사 통과 후 UNLIST 테스트 상품을 명시적으로 생성할 수 있다. Production 자동등록은 계속 잠금 상태다.
