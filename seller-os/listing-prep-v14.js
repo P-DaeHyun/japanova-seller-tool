@@ -98,6 +98,7 @@ function logisticId(v){return Number(v?.logistic_id??v?.logistics_channel_id??v?
 function logisticName(v){return String(v?.logistics_channel_name??v?.logistic_name??v?.channel_name??v?.name??`물류 ${logisticId(v)}`)}
 function categoryId(v){return Number(v?.category_id??v?.id??0)}
 function categoryName(v){return String(v?.display_category_name??v?.original_category_name??v?.category_name??v?.name??`카테고리 ${categoryId(v)}`)}
+function categoryHasChildren(v){return Boolean(v?.has_children??v?.hasChildren)}
 
 function gate(c,code){
   const p=plan(c,code),m=market(code),blocks=[];
@@ -286,7 +287,7 @@ function renderEditor(){
         <label class="full">등록 대상 Shop<select id="shop" class="select"><option value="">선택</option>${conns.map(x=>`<option value="${x.shopId}" ${Number(d.selectedShopId)===Number(x.shopId)?'selected':''}>${esc(x.shopName||'Shop')} · ${x.shopId}</option>`).join('')}</select></label>
         <label>카테고리 ID<input id="categoryId" class="input" type="number" min="1" value="${esc(d.categoryId||'')}"></label><label>카테고리명<input id="categoryName" class="input" value="${esc(d.categoryName||'')}"></label>
         <div class="full actions"><button class="btn ghost" id="loadCategories" ${d.selectedShopId?'':'disabled'}>카테고리 목록 불러오기</button><button class="btn ghost" id="loadAttributes" ${(d.selectedShopId&&d.categoryId)?'':'disabled'}>속성 불러오기</button><button class="btn ghost" id="loadLogistics" ${d.selectedShopId?'':'disabled'}>물류 불러오기</button></div>
-        ${cats.length?`<label class="full">불러온 카테고리<select id="categoryPick" class="select"><option value="">선택해서 ID 반영</option>${cats.map(x=>`<option value="${categoryId(x)}">${esc(categoryName(x))} · ${categoryId(x)}</option>`).join('')}</select></label>`:''}
+        ${cats.length?`<label class="full">불러온 카테고리<select id="categoryPick" class="select"><option value="">선택</option>${cats.map(x=>`<option value="${categoryId(x)}">${categoryHasChildren(x)?'▶ 하위 있음':'✓ 최종'} · ${esc(categoryName(x))} · ${categoryId(x)}</option>`).join('')}</select><span class="tiny">▶ 항목은 최종 카테고리가 아니야. 선택하면 하위 카테고리를 다시 불러와. ✓ 최종 항목을 골라야 속성을 불러올 수 있어.</span></label>`:''}
       </div><div class="metaBox">현재 환경: <b>${esc(state.listingStatus.environment||'unknown')}</b><br>이 화면은 카테고리/속성/물류 조회와 이미지 Media 업로드만 하고 상품 생성은 하지 않아.</div></section>
     </div>
     <div class="section grid2">
@@ -311,7 +312,17 @@ function bindEditor(c,code,d){
   $('#loadCategories')?.addEventListener('click',()=>loadCategories(d));
   $('#loadAttributes')?.addEventListener('click',()=>loadAttributes(c,code,d));
   $('#loadLogistics')?.addEventListener('click',()=>loadLogistics(d));
-  $('#categoryPick')?.addEventListener('change',async e=>{const id=Number(e.target.value||0);if(!id)return;const x=(state.categoryCache[String(d.selectedShopId)]||[]).find(v=>categoryId(v)===id);d.categoryId=id;d.categoryName=x?categoryName(x):'';d.attributes=[];d.mandatoryAttributeIds=[];d.attributeValues={};touch(d);await saveCandidate(c,{quiet:true});renderAll()});
+  $('#categoryPick')?.addEventListener('change',async e=>{
+    const id=Number(e.target.value||0);if(!id)return;
+    const x=(state.categoryCache[String(d.selectedShopId)]||[]).find(v=>categoryId(v)===id);
+    if(x&&categoryHasChildren(x)){
+      d.categoryId='';d.categoryName='';d.attributes=[];d.mandatoryAttributeIds=[];d.attributeValues={};touch(d);
+      await saveCandidate(c,{quiet:true});
+      return loadCategories(d,id);
+    }
+    d.categoryId=id;d.categoryName=x?categoryName(x):'';d.attributes=[];d.mandatoryAttributeIds=[];d.attributeValues={};touch(d);
+    await saveCandidate(c,{quiet:true});renderAll();flash(`최종 카테고리 “${d.categoryName}”를 선택했어. 이제 속성 불러오기를 눌러줘.`);
+  });
   $$('.attrSelect').forEach(el=>el.onchange=async()=>{const id=String(el.dataset.attrId);const meta=(state.attributeCache[attrCacheKey(d)]||[]).find(x=>attrId(x)===id);const vals=[...el.selectedOptions].map(o=>o.value).filter(Boolean);d.attributeValues[id]={valueIds:isMultiAttr(meta)?vals:vals.slice(0,1),text:''};rebuildAttributes(d,state.attributeCache[attrCacheKey(d)]||[]);touch(d);await saveCandidate(c,{quiet:true});renderAll()});
   $$('.attrText').forEach(el=>el.onchange=async()=>{const id=String(el.dataset.attrId);d.attributeValues[id]={valueIds:[],text:el.value.trim()};rebuildAttributes(d,state.attributeCache[attrCacheKey(d)]||[]);touch(d);await saveCandidate(c,{quiet:true});renderAll()});
   $$('.logisticCheck').forEach(el=>el.onchange=async()=>{d.logistics=$$('.logisticCheck:checked').map(x=>Number(x.value)).filter(Boolean);touch(d);await saveCandidate(c,{quiet:true});renderAll()});
@@ -328,13 +339,30 @@ function bindEditor(c,code,d){
     publishBtn.addEventListener('click',()=>publishSandbox(c,code,d,confirmInput.value.trim()));
   }
 }
-async function loadCategories(d){
+async function loadCategories(d,parentCategoryId=0){
   if(!d.selectedShopId)return flash('Shop을 먼저 선택해줘.','warn');
-  try{const r=await api(`/api/candidates/listing/categories?shopId=${encodeURIComponent(d.selectedShopId)}&language=en`);state.categoryCache[String(d.selectedShopId)]=arr(r.categoryList);renderEditor();flash(`카테고리 ${arr(r.categoryList).length}개를 불러왔어.`)}catch(e){flash(e.message,'bad')}
+  try{
+    const qs=new URLSearchParams({shopId:String(d.selectedShopId),language:'en'});
+    if(Number(parentCategoryId)>0)qs.set('parentCategoryId',String(parentCategoryId));
+    const r=await api(`/api/candidates/listing/categories?${qs.toString()}`);
+    const list=arr(r.categoryList);
+    state.categoryCache[String(d.selectedShopId)]=list;
+    renderEditor();
+    flash(Number(parentCategoryId)>0
+      ?`하위 카테고리 ${list.length}개를 불러왔어. ✓ 최종 항목을 선택해줘.`
+      :`최상위 카테고리 ${list.length}개를 불러왔어. ▶ 항목을 선택해 계속 내려가면 돼.`);
+  }catch(e){flash(e.message,'bad')}
 }
 async function loadAttributes(c,code,d){
-  if(!d.selectedShopId||!(Number(d.categoryId)>0))return flash('Shop과 카테고리 ID를 먼저 선택해줘.','warn');
-  try{const r=await api(`/api/candidates/listing/attributes?shopId=${encodeURIComponent(d.selectedShopId)}&categoryId=${encodeURIComponent(d.categoryId)}&language=en`);state.attributeCache[attrCacheKey(d)]=arr(r.attributeList);rebuildAttributes(d,state.attributeCache[attrCacheKey(d)]);touch(d);await saveCandidate(c,{quiet:true});renderAll();flash(`속성 ${arr(r.attributeList).length}개 · 필수 ${arr(r.mandatoryAttributes).length}개를 불러왔어.`)}catch(e){flash(e.message,'bad')}
+  if(!d.selectedShopId||!(Number(d.categoryId)>0))return flash('Shop과 ✓ 최종 카테고리를 먼저 선택해줘.','warn');
+  try{
+    const r=await api(`/api/candidates/listing/attributes?shopId=${encodeURIComponent(d.selectedShopId)}&categoryId=${encodeURIComponent(d.categoryId)}&language=en`);
+    const list=arr(r.attributeList);
+    state.attributeCache[attrCacheKey(d)]=list;
+    rebuildAttributes(d,list);touch(d);await saveCandidate(c,{quiet:true});renderAll();
+    if(!list.length)return flash('속성이 0개야. 상위 카테고리를 고른 경우 이런 현상이 생겨. “카테고리 목록 불러오기”부터 다시 눌러 ▶ 하위 있음 항목을 계속 내려간 뒤 ✓ 최종 카테고리를 선택해줘.','warn');
+    flash(`속성 ${list.length}개 · 필수 ${arr(r.mandatoryAttributes).length}개를 불러왔어.`);
+  }catch(e){flash(e.message,'bad')}
 }
 async function loadLogistics(d){
   if(!d.selectedShopId)return flash('Shop을 먼저 선택해줘.','warn');
