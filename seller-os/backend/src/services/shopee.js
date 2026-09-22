@@ -190,12 +190,19 @@ export async function postShopApi(path, { shopId, accessToken, body = {} }) {
  * Shopee Media API multipart 업로드.
  * 상품 생성과 분리되어 있으며, 호출자가 파일 업로드를 명시적으로 요청한 경우에만 사용한다.
  */
-export async function uploadShopImage({ shopId, accessToken, bytes, filename, contentType = 'image/jpeg' }) {
+export async function uploadShopImage({ bytes, filename, contentType = 'image/jpeg' }) {
   if (!bytes?.length) throw new Error('업로드할 이미지 파일이 비어 있습니다.');
   const path = '/api/v2/media_space/upload_image';
+  const { timestamp, sign } = signPublicApi(path);
+  const url = `${BASE_URL}${path}?${queryString({
+    partner_id: PARTNER_ID,
+    timestamp,
+    sign
+  })}`;
   const form = new FormData();
   form.append('image', new Blob([bytes], { type: contentType }), filename || 'image.jpg');
-  const response = await fetch(shopSignedUrl(path, { shopId, accessToken }), {
+  form.append('scene', 'normal');
+  const response = await fetch(url, {
     method: 'POST',
     body: form
   });
