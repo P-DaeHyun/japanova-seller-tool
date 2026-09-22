@@ -110,7 +110,9 @@ function basicDraftBlockers(candidate, marketCode, draft, plan) {
   if (!draft?.enabled) blockers.push('등록 준비 스위치가 꺼져 있어.');
   if (!String(draft?.title || '').trim()) blockers.push('상품명이 비어 있어.');
   if (String(draft?.title || '').trim().length > 120) blockers.push('상품명이 120자를 넘었어.');
-  if (!String(draft?.description || '').trim()) blockers.push('상세설명이 비어 있어.');
+  const descriptionText = String(draft?.description || '').trim();
+  if (!descriptionText) blockers.push('상세설명이 비어 있어.');
+  if (shopeeEnvironment() === 'sandbox' && descriptionText.length > 200) blockers.push(`Sandbox 상세설명은 200자 이하여야 해. 현재 ${descriptionText.length}자야.`);
   if (!String(draft?.sku || '').trim()) blockers.push('SKU가 비어 있어.');
   if (!(Number(draft?.priceLocal) > 0)) blockers.push('판매가가 확정되지 않았어.');
   if (!(Number(draft?.weightG) > 0)) blockers.push('포장 후 중량이 필요해.');
@@ -330,7 +332,9 @@ router.post('/listing/sandbox-test-candidate', async (_req, res) => {
         listingDraft: {
           enabled: true,
           title: existing.plans.SG?.listingDraft?.title || 'JAPANOVA Sandbox Test Item',
-          description: existing.plans.SG?.listingDraft?.description || 'JAPANOVA Shopee Open API sandbox listing test item. This is not a real product for sale.',
+          description: (String(existing.plans.SG?.listingDraft?.description || '').trim().length > 0 && String(existing.plans.SG.listingDraft.description).trim().length <= 200)
+            ? String(existing.plans.SG.listingDraft.description).trim()
+            : 'JAPANOVA Sandbox test item. API listing test only. Not for real sale.',
           sku: existing.plans.SG?.listingDraft?.sku || 'JNV-SANDBOX-SG-001',
           priceLocal: Number(existing.plans.SG?.listingDraft?.priceLocal || 19.9),
           initialStock: Number(existing.plans.SG?.listingDraft?.initialStock) > 0 ? Number(existing.plans.SG.listingDraft.initialStock) : 5,
@@ -630,15 +634,22 @@ router.post('/listing/publish', async (req, res) => {
       const existing = await client.query(`select * from listing_publish_attempts where candidate_id=$1 and market_code=$2 for update`, [candidateId, marketCode]);
       if (existing.rows[0]) {
         const a = attemptSummary(existing.rows[0]);
+        const priorError = String(existing.rows[0].error_message || '');
         const safeBrandRetry = shopeeEnvironment() === 'sandbox'
           && a.status === 'REVIEW'
           && !a.itemId
-          && String(existing.rows[0].error_message || '').includes('product.error_invalid_brand')
+          && priorError.includes('product.error_invalid_brand')
           && String(candidate?.plans?.[marketCode]?.listingDraft?.brandName || '').trim()
           && candidate?.plans?.[marketCode]?.listingDraft?.brandId !== ''
           && candidate?.plans?.[marketCode]?.listingDraft?.brandId !== null
           && candidate?.plans?.[marketCode]?.listingDraft?.brandId !== undefined;
-        if (safeBrandRetry) {
+        const safeDescriptionRetry = shopeeEnvironment() === 'sandbox'
+          && a.status === 'REVIEW'
+          && !a.itemId
+          && priorError.includes('product.error_desc_len_no_pass')
+          && String(candidate?.plans?.[marketCode]?.listingDraft?.description || '').trim().length >= 1
+          && String(candidate?.plans?.[marketCode]?.listingDraft?.description || '').trim().length <= 200;
+        if (safeBrandRetry || safeDescriptionRetry) {
           await client.query(`delete from listing_publish_attempts where id=$1`, [existing.rows[0].id]);
         } else {
           const msg = a.status === 'SUCCEEDED'
