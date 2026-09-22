@@ -333,7 +333,7 @@ router.post('/listing/sandbox-test-candidate', async (_req, res) => {
           description: existing.plans.SG?.listingDraft?.description || 'JAPANOVA Shopee Open API sandbox listing test item. This is not a real product for sale.',
           sku: existing.plans.SG?.listingDraft?.sku || 'JNV-SANDBOX-SG-001',
           priceLocal: Number(existing.plans.SG?.listingDraft?.priceLocal || 19.9),
-          initialStock: Number(existing.plans.SG?.listingDraft?.initialStock ?? 5),
+          initialStock: Number(existing.plans.SG?.listingDraft?.initialStock) > 0 ? Number(existing.plans.SG.listingDraft.initialStock) : 5,
           weightG: Number(existing.plans.SG?.listingDraft?.weightG || 100),
           lengthCm: Number(existing.plans.SG?.listingDraft?.lengthCm || 10),
           widthCm: Number(existing.plans.SG?.listingDraft?.widthCm || 8),
