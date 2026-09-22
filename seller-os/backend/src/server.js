@@ -753,7 +753,7 @@ async function runSandboxAttributeDiagnostic() {
   const data = await getShopApi('/api/v2/product/get_attribute_tree', {
     shopId,
     accessToken: auth.accessToken,
-    params: { category_ids: String(categoryId), language: 'en' }
+    params: { category_id_list: String(categoryId), language: 'en' }
   });
   const responseList = Array.isArray(data?.response?.list) ? data.response.list : Array.isArray(data?.list) ? data.list : [];
   const target = responseList.find(x => Number(x?.category_id) === categoryId) || responseList[0] || null;
