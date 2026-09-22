@@ -86,6 +86,46 @@ export function getShopeeConfigStatus() {
   };
 }
 
+export async function diagnosePartnerCredentialHosts() {
+  requireSecrets();
+  const path = '/api/v2/public/get_shops_by_partner';
+  const { timestamp, sign } = signPublicApi(path);
+  const hosts = {
+    sandbox_global_sg: 'https://openplatform.sandbox.test-stable.shopee.sg',
+    sandbox_global_partner: 'https://partner.test-stable.shopeemobile.com',
+    sandbox_china: 'https://openplatform.test-stable.shopee.cn'
+  };
+  const results = {};
+  for (const [name, host] of Object.entries(hosts)) {
+    const qs = queryString({
+      partner_id: PARTNER_ID,
+      timestamp,
+      sign,
+      page_no: 1,
+      page_size: 1
+    });
+    try {
+      const response = await fetch(`${host}${path}?${qs}`);
+      let body;
+      try { body = await response.json(); }
+      catch { body = { raw: (await response.text()).slice(0, 500) }; }
+      results[name] = {
+        host,
+        httpStatus: response.status,
+        ok: response.ok && !body?.error,
+        error: body?.error || null,
+        message: body?.message || null
+      };
+    } catch (error) {
+      results[name] = { host, httpStatus: null, ok: false, error: 'network_error', message: error.message };
+    }
+  }
+  return {
+    config: getShopeeConfigStatus(),
+    results
+  };
+}
+
 export function buildAuthorizationUrl({ redirectUri = REDIRECT_URI } = {}) {
   if (!PARTNER_ID) {
     throw new Error('SHOPEE_PARTNER_ID 환경변수가 필요합니다.');
