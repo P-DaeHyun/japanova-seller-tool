@@ -55,6 +55,17 @@ function isMandatoryAttribute(value) {
   return Boolean(value?.mandatory ?? value?.is_mandatory ?? value?.isMandatory);
 }
 
+function extractAttributeList(data, categoryId) {
+  const direct = data?.attribute_list || data?.response?.attribute_list;
+  if (Array.isArray(direct)) return direct;
+
+  const list = data?.response?.list || data?.list || [];
+  if (!Array.isArray(list)) return [];
+
+  const target = list.find(row => Number(row?.category_id) === Number(categoryId)) || list[0];
+  return Array.isArray(target?.attribute_tree) ? target.attribute_tree : [];
+}
+
 function logisticId(value) {
   return Number(
     value?.logistic_id ??
@@ -397,9 +408,9 @@ router.get('/listing/attributes', async (req, res) => {
     const data = await getShopApi('/api/v2/product/get_attribute_tree', {
       shopId,
       accessToken: auth.accessToken,
-      params: { category_id: categoryId, language: String(req.query.language || 'en').slice(0, 20) }
+      params: { category_ids: String(categoryId), language: String(req.query.language || 'en').slice(0, 20) }
     });
-    const attributeList = data.attribute_list || data.response?.attribute_list || [];
+    const attributeList = extractAttributeList(data, categoryId);
     res.json({ shop, categoryId, tokenRefreshed: auth.refreshed, attributeList, mandatoryAttributes: attributeList.filter(isMandatoryAttribute), raw: data.response || data });
   } catch (error) {
     fail(res, error, 502);
