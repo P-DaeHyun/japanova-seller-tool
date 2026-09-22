@@ -230,9 +230,9 @@ async function inspectListing(candidate, marketCode) {
       const attrData = await getShopApi('/api/v2/product/get_attribute_tree', {
         shopId: shop.shop_id,
         accessToken,
-        params: { category_id: Number(draft.categoryId), language: 'en' }
+        params: { category_id_list: String(Number(draft.categoryId)), language: 'en' }
       });
-      const attributeList = attrData.attribute_list || attrData.response?.attribute_list || [];
+      const attributeList = extractAttributeList(attrData, Number(draft.categoryId));
       mandatoryIds = attributeList.filter(isMandatoryAttribute).map(attrId).filter(Boolean);
       const presentIds = new Set(arr(draft.attributes).map(attrId).filter(Boolean));
       const missing = mandatoryIds.filter(id => !presentIds.has(String(id)));
