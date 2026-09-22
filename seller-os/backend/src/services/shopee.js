@@ -192,7 +192,7 @@ export async function postShopApi(path, { shopId, accessToken, body = {} }) {
  */
 export async function uploadShopImage({ shopId, accessToken, bytes, filename, contentType = 'image/jpeg' }) {
   if (!bytes?.length) throw new Error('업로드할 이미지 파일이 비어 있습니다.');
-  const path = '/api/v2/media/upload_image';
+  const path = '/api/v2/media_space/upload_image';
   const form = new FormData();
   form.append('image', new Blob([bytes], { type: contentType }), filename || 'image.jpg');
   const response = await fetch(shopSignedUrl(path, { shopId, accessToken }), {
@@ -309,6 +309,6 @@ export const ShopeePaths = Object.freeze({
   category: '/api/v2/product/get_category',
   attributeTree: '/api/v2/product/get_attribute_tree',
   logisticsChannelList: '/api/v2/logistics/get_channel_list',
-  uploadImage: '/api/v2/media/upload_image',
+  uploadImage: '/api/v2/media_space/upload_image',
   addItem: '/api/v2/product/add_item'
 });
