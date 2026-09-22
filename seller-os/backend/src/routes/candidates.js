@@ -327,10 +327,11 @@ router.get('/listing/status', async (_req, res) => {
   if (!requireDb(res)) return;
   try {
     const result = await query(
-      `select market_code, shop_id, shop_name, status, last_sync_at
+      `select market_code, shop_id, shop_name, status, last_sync_at, updated_at,
+              access_token_expires_at, refresh_token_expires_at
        from shopee_connections
        where status='CONNECTED'
-       order by market_code nulls last, shop_id`
+       order by market_code nulls last, updated_at desc, shop_id desc`
     );
     const environment = shopeeEnvironment();
     res.json({
@@ -353,7 +354,10 @@ router.get('/listing/status', async (_req, res) => {
         shopId: Number(row.shop_id),
         shopName: row.shop_name,
         status: row.status,
-        lastSyncAt: row.last_sync_at
+        lastSyncAt: row.last_sync_at,
+        updatedAt: row.updated_at,
+        accessTokenExpiresAt: row.access_token_expires_at,
+        refreshTokenExpiresAt: row.refresh_token_expires_at
       }))
     });
   } catch (error) {
