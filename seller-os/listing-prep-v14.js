@@ -18,7 +18,7 @@ const fmt=(n,d=0)=>Number.isFinite(Number(n))?Number(n).toLocaleString('ko-KR',{
 const now=()=>new Date().toISOString();
 const uniq=(a)=>[...new Set(a)];
 const arr=(v)=>Array.isArray(v)?v:[];
-let state={candidates:[],selectedId:null,market:'TW',listingStatus:{environment:'unknown',connections:[]},categoryCache:{},attributeCache:{},logisticsCache:{},busy:false};
+let state={candidates:[],selectedId:null,market:'TW',listingStatus:{environment:'unknown',connections:[]},categoryCache:{},attributeCache:{},brandCache:{},logisticsCache:{},busy:false};
 
 async function api(path,opts={}){
   const headers={...(opts.headers||{})};
@@ -60,6 +60,10 @@ function draft(c,code){
   if(d.widthCm===undefined)d.widthCm=Number(c.widthCm||0);
   if(d.heightCm===undefined)d.heightCm=Number(c.heightCm||0);
   if(!d.condition)d.condition='NEW';
+  if(d.brandId===undefined)d.brandId='';
+  if(!d.brandName)d.brandName='';
+  if(!d.brandOriginalName)d.brandOriginalName=d.brandName||'';
+  if(d.brandMandatory===undefined)d.brandMandatory=false;
   d.imageUrls=arr(d.imageUrls);
   d.imageIds=arr(d.imageIds);
   d.imageUploads=arr(d.imageUploads);
@@ -143,6 +147,7 @@ function clientReadiness(c,code){
   if(!d.imageIds.length)blocks.push('Shopee image_id가 하나 이상 필요해.');
   if(d.imageIds.length>9)blocks.push('상품 이미지는 최대 9개까지만 준비해.');
   if(!d.logistics.length)blocks.push('물류 채널을 하나 이상 선택해야 해.');
+  if(d.brandMandatory && (!String(d.brandName||'').trim() || d.brandId==='' || d.brandId===null))blocks.push('이 카테고리는 브랜드 선택이 필수야.');
   const present=new Set(d.attributes.map(attrId).filter(Boolean));
   const missing=d.mandatoryAttributeIds.filter(id=>!present.has(String(id)));
   if(missing.length)blocks.push(`필수속성 ${missing.length}개가 아직 미입력이야.`);
@@ -157,7 +162,9 @@ function buildPackage(c,code){
   const payload={
     item_name:String(d.title||'').trim(),description:String(d.description||'').trim(),item_sku:String(d.sku||'').trim(),
     category_id:Number(d.categoryId||0),original_price:Number(d.priceLocal||0),weight:Number(d.weightG||0)/1000,
-    ...(dims?{dimension:dims}:{}),condition:d.condition||'NEW',image:{image_id_list:d.imageIds},
+    ...(dims?{dimension:dims}:{}),condition:d.condition||'NEW',
+    ...((String(d.brandName||'').trim() && d.brandId!=='' && d.brandId!==null)?{brand:{brand_id:Number(d.brandId),original_brand_name:String(d.brandOriginalName||d.brandName).trim()}}:{}),
+    image:{image_id_list:d.imageIds},
     logistic_info:d.logistics.map(id=>({logistic_id:Number(id),enabled:true})).filter(x=>x.logistic_id>0),
     attribute_list:d.attributes,seller_stock:[{stock:Number(d.initialStock||0)}],item_status:'UNLIST'
   };
@@ -221,9 +228,14 @@ function renderMarketTabs(){
 }
 function renderAttributeFields(d){
   const metadata=state.attributeCache[attrCacheKey(d)]||[];
-  if(!metadata.length)return '<div class="empty smallEmpty">카테고리 선택 후 “속성 불러오기”를 눌러줘.</div>';
+  const brandMeta=state.brandCache[attrCacheKey(d)]||null;
+  const brands=arr(brandMeta?.brandList);
+  const brandField=brandMeta
+    ? `<div class="attrCard ${brandMeta.isMandatory?'required':''}"><div class="attrHead"><b>Brand</b><span>${brandMeta.isMandatory?'필수':'선택'} · Shopee 브랜드</span></div><select id="brandSelect" class="select"><option value="">브랜드 선택</option>${brands.map(b=>`<option value="${esc(b.brand_id)}" ${Number(d.brandId)===Number(b.brand_id)?'selected':''}>${esc(b.display_brand_name||b.original_brand_name||('Brand '+b.brand_id))}</option>`).join('')}</select><div class="tiny">Shopee get_brand_list 기준</div></div>`
+    : '';
+  if(!metadata.length)return brandField||'<div class="empty smallEmpty">카테고리 선택 후 “속성 불러오기”를 눌러줘.</div>';
   const sorted=[...metadata].sort((a,b)=>Number(attrMandatory(b))-Number(attrMandatory(a))||attrName(a).localeCompare(attrName(b)));
-  return `<div class="attrGrid">${sorted.map(meta=>{
+  return `<div class="attrGrid">${brandField}${sorted.map(meta=>{
     const id=attrId(meta),saved=d.attributeValues[id]||{},options=attrOptions(meta),required=attrMandatory(meta),multi=isMultiAttr(meta);
     const selected=new Set(arr(saved.valueIds).map(String));
     let field='';
@@ -279,7 +291,7 @@ function renderEditor(){
         <label>SKU<input id="sku" class="input" value="${esc(d.sku)}"></label><label>판매가 ${m.cur}<input id="price" class="input" type="number" step="any" min="0" value="${esc(d.priceLocal||'')}"></label>
         <label>등록재고<input id="stock" class="input" type="number" min="0" value="${esc(d.initialStock||0)}"></label><label>포장중량 g<input id="weight" class="input" type="number" min="1" value="${esc(d.weightG||'')}"></label>
         <label>가로 cm<input id="length" class="input" type="number" step="any" min="0" value="${esc(d.lengthCm||'')}"></label><label>세로 cm<input id="width" class="input" type="number" step="any" min="0" value="${esc(d.widthCm||'')}"></label>
-        <label>높이 cm<input id="height" class="input" type="number" step="any" min="0" value="${esc(d.heightCm||'')}"></label><label>브랜드<input id="brand" class="input" value="${esc(d.brandName||'')}"></label>
+        <label>높이 cm<input id="height" class="input" type="number" step="any" min="0" value="${esc(d.heightCm||'')}"></label><label>브랜드 상태<input class="input" value="${esc(d.brandName|| (d.brandMandatory?'선택 필요':'미선택'))}" disabled></label>
         <label class="full">GTIN / JAN / EAN<input id="gtin" class="input" value="${esc(d.gtin||'')}"></label>
         <label class="full">상세설명<textarea id="description">${esc(d.description)}</textarea></label>
       </div></section>
@@ -305,7 +317,7 @@ function renderEditor(){
 function bindEditor(c,code,d){
   const bind=(id,key,parser=v=>v)=>{const el=$(`#${id}`);if(!el)return;el.onchange=async()=>{d[key]=parser(el.value);touch(d);await saveCandidate(c,{quiet:true});renderAll()}};
   $('#enabled').onchange=async e=>{d.enabled=e.target.checked;touch(d);await saveCandidate(c,{quiet:true});renderAll()};
-  bind('title','title');bind('sku','sku',cleanSku);bind('price','priceLocal',Number);bind('stock','initialStock',v=>Math.max(0,Math.floor(Number(v)||0)));bind('weight','weightG',Number);bind('length','lengthCm',Number);bind('width','widthCm',Number);bind('height','heightCm',Number);bind('brand','brandName');bind('gtin','gtin');bind('description','description');
+  bind('title','title');bind('sku','sku',cleanSku);bind('price','priceLocal',Number);bind('stock','initialStock',v=>Math.max(0,Math.floor(Number(v)||0)));bind('weight','weightG',Number);bind('length','lengthCm',Number);bind('width','widthCm',Number);bind('height','heightCm',Number);bind('gtin','gtin');bind('description','description');
   $('#shop').onchange=async e=>{d.selectedShopId=e.target.value?Number(e.target.value):null;d.categoryId='';d.categoryName='';d.logistics=[];d.attributes=[];d.mandatoryAttributeIds=[];d.attributeValues={};touch(d);await saveCandidate(c,{quiet:true});renderAll()};
   bind('categoryId','categoryId',v=>Number(v)||'');bind('categoryName','categoryName');
   $('#imageUrls').onchange=async e=>{d.imageUrls=String(e.target.value||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0,9);touch(d);await saveCandidate(c,{quiet:true});renderAll()};
@@ -323,7 +335,16 @@ function bindEditor(c,code,d){
     d.categoryId=id;d.categoryName=x?categoryName(x):'';d.attributes=[];d.mandatoryAttributeIds=[];d.attributeValues={};touch(d);
     await saveCandidate(c,{quiet:true});renderAll();flash(`최종 카테고리 “${d.categoryName}”를 선택했어. 이제 속성 불러오기를 눌러줘.`);
   });
-  $$('.attrSelect').forEach(el=>el.onchange=async()=>{const id=String(el.dataset.attrId);const meta=(state.attributeCache[attrCacheKey(d)]||[]).find(x=>attrId(x)===id);const vals=[...el.selectedOptions].map(o=>o.value).filter(Boolean);d.attributeValues[id]={valueIds:isMultiAttr(meta)?vals:vals.slice(0,1),text:''};rebuildAttributes(d,state.attributeCache[attrCacheKey(d)]||[]);touch(d);await saveCandidate(c,{quiet:true});renderAll()});
+  $('#brandSelect')?.addEventListener('change',async e=>{
+    const meta=state.brandCache[attrCacheKey(d)]||{};
+    const b=arr(meta.brandList).find(x=>Number(x.brand_id)===Number(e.target.value));
+    d.brandId=b?Number(b.brand_id):'';
+    d.brandName=b?String(b.display_brand_name||b.original_brand_name||''):'';
+    d.brandOriginalName=b?String(b.original_brand_name||b.display_brand_name||''):'';
+    d.brandMandatory=Boolean(meta.isMandatory);
+    touch(d);await saveCandidate(c,{quiet:true});renderAll();
+  });
+  $('.attrSelect').forEach(el=>el.onchange=async()=>{const id=String(el.dataset.attrId);const meta=(state.attributeCache[attrCacheKey(d)]||[]).find(x=>attrId(x)===id);const vals=[...el.selectedOptions].map(o=>o.value).filter(Boolean);d.attributeValues[id]={valueIds:isMultiAttr(meta)?vals:vals.slice(0,1),text:''};rebuildAttributes(d,state.attributeCache[attrCacheKey(d)]||[]);touch(d);await saveCandidate(c,{quiet:true});renderAll()});
   $$('.attrText').forEach(el=>el.onchange=async()=>{const id=String(el.dataset.attrId);d.attributeValues[id]={valueIds:[],text:el.value.trim()};rebuildAttributes(d,state.attributeCache[attrCacheKey(d)]||[]);touch(d);await saveCandidate(c,{quiet:true});renderAll()});
   $$('.logisticCheck').forEach(el=>el.onchange=async()=>{d.logistics=$$('.logisticCheck:checked').map(x=>Number(x.value)).filter(Boolean);touch(d);await saveCandidate(c,{quiet:true});renderAll()});
   $('#uploadImages')?.addEventListener('click',()=>uploadImages(c,d));
@@ -356,12 +377,27 @@ async function loadCategories(d,parentCategoryId=0){
 async function loadAttributes(c,code,d){
   if(!d.selectedShopId||!(Number(d.categoryId)>0))return flash('Shop과 ✓ 최종 카테고리를 먼저 선택해줘.','warn');
   try{
-    const r=await api(`/api/candidates/listing/attributes?shopId=${encodeURIComponent(d.selectedShopId)}&categoryId=${encodeURIComponent(d.categoryId)}&language=en`);
+    const [r,brandR]=await Promise.all([
+      api(`/api/candidates/listing/attributes?shopId=${encodeURIComponent(d.selectedShopId)}&categoryId=${encodeURIComponent(d.categoryId)}&language=en`),
+      api(`/api/candidates/listing/brands?shopId=${encodeURIComponent(d.selectedShopId)}&categoryId=${encodeURIComponent(d.categoryId)}&language=en`).catch(()=>({brandList:[],isMandatory:false}))
+    ]);
     const list=arr(r.attributeList);
     state.attributeCache[attrCacheKey(d)]=list;
+    state.brandCache[attrCacheKey(d)]=brandR||{brandList:[],isMandatory:false};
+    d.brandMandatory=Boolean(brandR?.isMandatory);
+    const brands=arr(brandR?.brandList);
+    if(d.brandMandatory && !d.brandId){
+      const noBrand=brands.find(b=>/^(no brand|無品牌|無牌|none)$/i.test(String(b.display_brand_name||b.original_brand_name||'').trim()));
+      const auto=noBrand||(brands.length===1?brands[0]:null);
+      if(auto){
+        d.brandId=Number(auto.brand_id);
+        d.brandName=String(auto.display_brand_name||auto.original_brand_name||'');
+        d.brandOriginalName=String(auto.original_brand_name||auto.display_brand_name||'');
+      }
+    }
     rebuildAttributes(d,list);touch(d);await saveCandidate(c,{quiet:true});renderAll();
-    if(!list.length)return flash('속성이 0개야. 상위 카테고리를 고른 경우 이런 현상이 생겨. “카테고리 목록 불러오기”부터 다시 눌러 ▶ 하위 있음 항목을 계속 내려간 뒤 ✓ 최종 카테고리를 선택해줘.','warn');
-    flash(`속성 ${list.length}개 · 필수 ${arr(r.mandatoryAttributes).length}개를 불러왔어.`);
+    if(!list.length&&!brands.length)return flash('속성과 브랜드 목록이 모두 비어 있어. 최종 카테고리인지 다시 확인해줘.','warn');
+    flash(`속성 ${list.length}개 · 필수 ${arr(r.mandatoryAttributes).length}개 · 브랜드 ${brands.length}개${d.brandMandatory?'(필수)':''}를 불러왔어.`);
   }catch(e){flash(e.message,'bad')}
 }
 async function loadLogistics(d){
