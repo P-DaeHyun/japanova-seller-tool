@@ -321,7 +321,40 @@ router.post('/listing/sandbox-test-candidate', async (_req, res) => {
     const testId = 'SANDBOX-TEST-TW';
     const existing = (await listCandidates()).find(x => String(x.id) === testId);
     if (existing) {
-      return res.json({ message: '기존 Sandbox 테스트 후보를 사용해.', candidate: existing, created: false });
+      existing.plans = existing.plans || {};
+      existing.plans.SG = {
+        ...(existing.plans.SG || {}),
+        regulationStatus: 'OK',
+        decision: 'SELL',
+        plannedPrice: Number(existing.plans.SG?.plannedPrice || 19.9),
+        listingDraft: {
+          enabled: true,
+          title: existing.plans.SG?.listingDraft?.title || 'JAPANOVA Sandbox Test Item',
+          description: existing.plans.SG?.listingDraft?.description || 'JAPANOVA Shopee Open API sandbox listing test item. This is not a real product for sale.',
+          sku: existing.plans.SG?.listingDraft?.sku || 'JNV-SANDBOX-SG-001',
+          priceLocal: Number(existing.plans.SG?.listingDraft?.priceLocal || 19.9),
+          initialStock: Number(existing.plans.SG?.listingDraft?.initialStock ?? 5),
+          weightG: Number(existing.plans.SG?.listingDraft?.weightG || 100),
+          lengthCm: Number(existing.plans.SG?.listingDraft?.lengthCm || 10),
+          widthCm: Number(existing.plans.SG?.listingDraft?.widthCm || 8),
+          heightCm: Number(existing.plans.SG?.listingDraft?.heightCm || 3),
+          condition: existing.plans.SG?.listingDraft?.condition || 'NEW',
+          imageUrls: existing.plans.SG?.listingDraft?.imageUrls || [],
+          imageIds: existing.plans.SG?.listingDraft?.imageIds || [],
+          imageUploads: existing.plans.SG?.listingDraft?.imageUploads || [],
+          logistics: existing.plans.SG?.listingDraft?.logistics || [],
+          attributes: existing.plans.SG?.listingDraft?.attributes || [],
+          mandatoryAttributeIds: existing.plans.SG?.listingDraft?.mandatoryAttributeIds || [],
+          attributeValues: existing.plans.SG?.listingDraft?.attributeValues || {},
+          brandId: existing.plans.SG?.listingDraft?.brandId ?? '',
+          brandName: existing.plans.SG?.listingDraft?.brandName || '',
+          brandOriginalName: existing.plans.SG?.listingDraft?.brandOriginalName || '',
+          brandMandatory: Boolean(existing.plans.SG?.listingDraft?.brandMandatory),
+          updatedAt: new Date().toISOString()
+        }
+      };
+      const updated = await saveCandidate(testId, existing);
+      return res.json({ message: '기존 Sandbox 테스트 후보에 싱가포르(SG) Local Shop 테스트 설정을 추가했어.', candidate: updated, created: false, updatedFor: 'SG' });
     }
     const candidate = await saveCandidate(testId, {
       name: 'JAPANOVA Sandbox Test Item',
