@@ -583,10 +583,22 @@ router.post('/listing/publish', async (req, res) => {
       const existing = await client.query(`select * from listing_publish_attempts where candidate_id=$1 and market_code=$2 for update`, [candidateId, marketCode]);
       if (existing.rows[0]) {
         const a = attemptSummary(existing.rows[0]);
-        const msg = a.status === 'SUCCEEDED'
-          ? `이미 Shopee item_id ${a.itemId}로 등록 완료된 시장이야.`
-          : `이 시장에 ${a.status} 등록 시도 기록이 있어 자동 재등록을 차단했어. 원장 확인이 필요해.`;
-        throw Object.assign(new Error(msg), { httpStatus: 409 });
+        const safeBrandRetry = shopeeEnvironment() === 'sandbox'
+          && a.status === 'REVIEW'
+          && !a.itemId
+          && String(existing.rows[0].error_message || '').includes('product.error_invalid_brand')
+          && String(candidate?.plans?.[marketCode]?.listingDraft?.brandName || '').trim()
+          && candidate?.plans?.[marketCode]?.listingDraft?.brandId !== ''
+          && candidate?.plans?.[marketCode]?.listingDraft?.brandId !== null
+          && candidate?.plans?.[marketCode]?.listingDraft?.brandId !== undefined;
+        if (safeBrandRetry) {
+          await client.query(`delete from listing_publish_attempts where id=$1`, [existing.rows[0].id]);
+        } else {
+          const msg = a.status === 'SUCCEEDED'
+            ? `이미 Shopee item_id ${a.itemId}로 등록 완료된 시장이야.`
+            : `이 시장에 ${a.status} 등록 시도 기록이 있어 자동 재등록을 차단했어. 원장 확인이 필요해.`;
+          throw Object.assign(new Error(msg), { httpStatus: 409 });
+        }
       }
       const inspection = await inspectListing(candidate, marketCode);
       if (!inspection.ready) {
