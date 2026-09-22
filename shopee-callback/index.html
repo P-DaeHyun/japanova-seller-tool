@@ -12,28 +12,24 @@
     body{margin:0;min-height:100vh;background:linear-gradient(180deg,#07111f,#0a1628);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;display:grid;place-items:center;padding:24px}
     .card{width:min(720px,100%);background:rgba(15,27,45,.96);border:1px solid var(--line);border-radius:20px;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.28)}
     .brand{font-weight:900;letter-spacing:.02em;color:#fff;margin-bottom:18px}
-    h1{margin:0 0 8px;font-size:24px}
-    .muted{color:var(--muted);line-height:1.65}
+    h1{margin:0 0 8px;font-size:24px}.muted{color:var(--muted);line-height:1.65}
     .status{display:flex;align-items:center;gap:10px;margin:20px 0;padding:14px 16px;border:1px solid #244c35;background:#0b2a18;border-radius:14px}
     .dot{width:10px;height:10px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 5px rgba(34,197,94,.12)}
-    .row{margin-top:16px}
-    .label{font-size:12px;color:var(--muted);margin-bottom:6px}
+    .row{margin-top:16px}.label{font-size:12px;color:var(--muted);margin-bottom:6px}
     .value{background:#08101d;border:1px solid var(--line);border-radius:12px;padding:12px;word-break:break-all;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
-    .secret{filter:blur(5px);user-select:none;cursor:pointer}
-    .secret.revealed{filter:none;user-select:text}
+    .secret{filter:blur(5px);user-select:none;cursor:pointer}.secret.revealed{filter:none;user-select:text}
     .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
     button,a.btn{appearance:none;border:0;border-radius:12px;padding:11px 14px;font-weight:800;cursor:pointer;text-decoration:none}
-    button{background:var(--btn);color:#fff}
+    button{background:var(--btn);color:#fff}button.secondary{background:#18263b;border:1px solid var(--line)}
     a.btn{background:#18263b;color:#fff;border:1px solid var(--line)}
     .warn{margin-top:18px;padding:12px 14px;border-radius:12px;background:#2a2112;border:1px solid #5a4720;color:#ffd98a;font-size:13px;line-height:1.6}
-    .error{border-color:#5b2b2b;background:#2b1212}
-    .error .dot{background:#ef4444;box-shadow:0 0 0 5px rgba(239,68,68,.12)}
+    .error{border-color:#5b2b2b;background:#2b1212}.error .dot{background:#ef4444;box-shadow:0 0 0 5px rgba(239,68,68,.12)}
   </style>
 </head>
 <body>
   <main class="card">
     <div class="brand">JAPANOVA</div>
-    <h1 id="title">Shopee Sandbox 연결 결과</h1>
+    <h1>Shopee Sandbox 연결 결과</h1>
     <p class="muted" id="desc">Shopee가 전달한 인증 결과를 확인하고 있어.</p>
 
     <div class="status" id="statusBox"><span class="dot"></span><strong id="statusText">인증 정보 확인 중…</strong></div>
@@ -44,12 +40,13 @@
     <div class="row"><div class="label">State</div><div id="state" class="value">-</div></div>
 
     <div class="actions">
-      <button id="copyBtn" type="button">인증 코드 복사</button>
-      <a class="btn" href="../seller-os/">JAPANOVA Seller OS로 돌아가기</a>
+      <button id="serverBtn" type="button">JAPANOVA 서버에 연결하기</button>
+      <button id="copyBtn" class="secondary" type="button">인증 코드 복사</button>
+      <a class="btn" href="../seller-os/">Seller OS로 돌아가기</a>
     </div>
 
     <div class="warn">
-      이 페이지는 값을 저장하거나 외부로 전송하지 않아. Partner Key, access token, refresh token은 GitHub Pages에 넣지 않고 서버에서만 처리할 거야. 인증 코드는 일회성 민감정보라 캡처에 노출하지 않는 게 좋아.
+      Partner Key, access token, refresh token은 GitHub Pages에 저장하지 않아. 「JAPANOVA 서버에 연결하기」를 누르면 지금 받은 일회성 code와 Shop/Main Account ID만 JAPANOVA의 Render 백엔드로 HTTPS 전송해서 토큰 교환을 진행해.
     </div>
   </main>
 
@@ -64,6 +61,7 @@
   const errorMsg = q.get('message') || q.get('error_message') || '';
 
   const codeEl = document.getElementById('code');
+  const serverBtn = document.getElementById('serverBtn');
   document.getElementById('shop').textContent = shopId || '-';
   document.getElementById('main').textContent = mainId || '-';
   document.getElementById('state').textContent = state || '-';
@@ -73,12 +71,24 @@
     document.getElementById('statusBox').classList.add('error');
     document.getElementById('statusText').textContent = error ? 'Shopee 인증 오류' : '인증 코드가 전달되지 않았어';
     document.getElementById('desc').textContent = errorMsg || 'Open Platform에서 Authorize를 다시 진행해줘.';
+    serverBtn.disabled = true;
   } else {
     document.getElementById('statusText').textContent = 'Shopee Sandbox 인증 정보를 받았어';
-    document.getElementById('desc').textContent = '다음 단계는 이 인증 코드를 JAPANOVA 서버에서 access token으로 교환하는 거야.';
+    document.getElementById('desc').textContent = mainId && !shopId
+      ? 'Main Account 방식으로 인증됐어. 서버에서 토큰 교환 후 승인된 Shop 목록을 받아올 거야.'
+      : '다음 단계는 이 인증 코드를 JAPANOVA 서버에서 access token으로 교환하는 거야.';
   }
 
   codeEl.addEventListener('click', () => codeEl.classList.toggle('revealed'));
+
+  serverBtn.addEventListener('click', () => {
+    if (!code || (!shopId && !mainId)) return;
+    const target = new URL('https://japanova-seller-os-api.onrender.com/api/shopee/callback');
+    target.searchParams.set('code', code);
+    if (shopId) target.searchParams.set('shop_id', shopId);
+    if (mainId) target.searchParams.set('main_account_id', mainId);
+    location.href = target.toString();
+  });
 
   document.getElementById('copyBtn').addEventListener('click', async () => {
     if (!code) return;
@@ -88,9 +98,7 @@
       const before = b.textContent;
       b.textContent = '복사됨';
       setTimeout(() => b.textContent = before, 1200);
-    } catch (_) {
-      codeEl.classList.add('revealed');
-    }
+    } catch (_) { codeEl.classList.add('revealed'); }
   });
 })();
 </script>
