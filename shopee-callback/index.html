@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="referrer" content="no-referrer">
+  <title>JAPANOVA · Shopee 연결</title>
+  <style>
+    :root{color-scheme:dark;--bg:#07111f;--card:#0f1b2d;--line:#26364f;--text:#f8fafc;--muted:#9fb0c8;--ok:#22c55e;--warn:#f59e0b;--btn:#ee4d2d}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;background:linear-gradient(180deg,#07111f,#0a1628);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;display:grid;place-items:center;padding:24px}
+    .card{width:min(720px,100%);background:rgba(15,27,45,.96);border:1px solid var(--line);border-radius:20px;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.28)}
+    .brand{font-weight:900;letter-spacing:.02em;color:#fff;margin-bottom:18px}
+    h1{margin:0 0 8px;font-size:24px}
+    .muted{color:var(--muted);line-height:1.65}
+    .status{display:flex;align-items:center;gap:10px;margin:20px 0;padding:14px 16px;border:1px solid #244c35;background:#0b2a18;border-radius:14px}
+    .dot{width:10px;height:10px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 5px rgba(34,197,94,.12)}
+    .row{margin-top:16px}
+    .label{font-size:12px;color:var(--muted);margin-bottom:6px}
+    .value{background:#08101d;border:1px solid var(--line);border-radius:12px;padding:12px;word-break:break-all;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+    .secret{filter:blur(5px);user-select:none;cursor:pointer}
+    .secret.revealed{filter:none;user-select:text}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+    button,a.btn{appearance:none;border:0;border-radius:12px;padding:11px 14px;font-weight:800;cursor:pointer;text-decoration:none}
+    button{background:var(--btn);color:#fff}
+    a.btn{background:#18263b;color:#fff;border:1px solid var(--line)}
+    .warn{margin-top:18px;padding:12px 14px;border-radius:12px;background:#2a2112;border:1px solid #5a4720;color:#ffd98a;font-size:13px;line-height:1.6}
+    .error{border-color:#5b2b2b;background:#2b1212}
+    .error .dot{background:#ef4444;box-shadow:0 0 0 5px rgba(239,68,68,.12)}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="brand">JAPANOVA</div>
+    <h1 id="title">Shopee Sandbox 연결 결과</h1>
+    <p class="muted" id="desc">Shopee가 전달한 인증 결과를 확인하고 있어.</p>
+
+    <div class="status" id="statusBox"><span class="dot"></span><strong id="statusText">인증 정보 확인 중…</strong></div>
+
+    <div class="row"><div class="label">Shop ID</div><div id="shop" class="value">-</div></div>
+    <div class="row"><div class="label">Main Account ID</div><div id="main" class="value">-</div></div>
+    <div class="row"><div class="label">Authorization Code — 클릭하면 표시</div><div id="code" class="value secret" title="클릭하면 표시">-</div></div>
+    <div class="row"><div class="label">State</div><div id="state" class="value">-</div></div>
+
+    <div class="actions">
+      <button id="copyBtn" type="button">인증 코드 복사</button>
+      <a class="btn" href="../seller-os/">JAPANOVA Seller OS로 돌아가기</a>
+    </div>
+
+    <div class="warn">
+      이 페이지는 값을 저장하거나 외부로 전송하지 않아. Partner Key, access token, refresh token은 GitHub Pages에 넣지 않고 서버에서만 처리할 거야. 인증 코드는 일회성 민감정보라 캡처에 노출하지 않는 게 좋아.
+    </div>
+  </main>
+
+<script>
+(() => {
+  const q = new URLSearchParams(location.search);
+  const code = q.get('code') || '';
+  const shopId = q.get('shop_id') || '';
+  const mainId = q.get('main_account_id') || '';
+  const state = q.get('state') || '';
+  const error = q.get('error') || q.get('error_code') || '';
+  const errorMsg = q.get('message') || q.get('error_message') || '';
+
+  const codeEl = document.getElementById('code');
+  document.getElementById('shop').textContent = shopId || '-';
+  document.getElementById('main').textContent = mainId || '-';
+  document.getElementById('state').textContent = state || '-';
+  codeEl.textContent = code || '-';
+
+  if (error || !code) {
+    document.getElementById('statusBox').classList.add('error');
+    document.getElementById('statusText').textContent = error ? 'Shopee 인증 오류' : '인증 코드가 전달되지 않았어';
+    document.getElementById('desc').textContent = errorMsg || 'Open Platform에서 Authorize를 다시 진행해줘.';
+  } else {
+    document.getElementById('statusText').textContent = 'Shopee Sandbox 인증 정보를 받았어';
+    document.getElementById('desc').textContent = '다음 단계는 이 인증 코드를 JAPANOVA 서버에서 access token으로 교환하는 거야.';
+  }
+
+  codeEl.addEventListener('click', () => codeEl.classList.toggle('revealed'));
+
+  document.getElementById('copyBtn').addEventListener('click', async () => {
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code);
+      const b = document.getElementById('copyBtn');
+      const before = b.textContent;
+      b.textContent = '복사됨';
+      setTimeout(() => b.textContent = before, 1200);
+    } catch (_) {
+      codeEl.classList.add('revealed');
+    }
+  });
+})();
+</script>
+</body>
+</html>
