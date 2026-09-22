@@ -10,13 +10,13 @@ const BASE_URL = ENV === 'production'
   ? 'https://partner.shopeemobile.com'
   : ENV === 'sandbox_cn'
     ? 'https://openplatform.test-stable.shopee.cn'
-    : 'https://partner.test-stable.shopeemobile.com';
+    : 'https://openplatform.sandbox.test-stable.shopee.sg';
 
 const AUTH_BASE_URL = ENV === 'production'
-  ? 'https://partner.shopeemobile.com'
+  ? 'https://open.shopee.com'
   : ENV === 'sandbox_cn'
-    ? 'https://openplatform.test-stable.shopee.cn'
-    : 'https://partner.test-stable.shopeemobile.com';
+    ? 'https://open.sandbox.test-stable.shopee.cn'
+    : 'https://open.sandbox.test-stable.shopee.com';
 
 function requireSecrets() {
   if (!PARTNER_ID || !PARTNER_KEY) {
