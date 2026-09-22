@@ -76,6 +76,11 @@ function logisticId(value) {
   );
 }
 
+function extractBrandList(data) {
+  const root = data?.response || data || {};
+  return Array.isArray(root?.brand_list) ? root.brand_list : [];
+}
+
 function imageResult(data) {
   const root = data?.response || data || {};
   const listEntry = arr(root.image_info_list)[0] || null;
@@ -156,6 +161,9 @@ function buildAddItemPayload(draft) {
         package_height: Math.round(Number(draft.heightCm))
       }
     : null;
+  const brandId = Number(draft.brandId);
+  const brandName = String(draft.brandOriginalName || draft.brandName || '').trim();
+  const hasBrand = brandName && Number.isFinite(brandId) && brandId >= 0;
   return {
     item_name: String(draft.title || '').trim(),
     description: String(draft.description || '').trim(),
@@ -165,6 +173,7 @@ function buildAddItemPayload(draft) {
     weight: Number(draft.weightG) / 1000,
     ...(dimensions ? { dimension: dimensions } : {}),
     condition: draft.condition || 'NEW',
+    ...(hasBrand ? { brand: { brand_id: brandId, original_brand_name: brandName } } : {}),
     image: { image_id_list: arr(draft.imageIds) },
     logistic_info: arr(draft.logistics)
       .map(id => ({ logistic_id: Number(id), enabled: true }))
@@ -253,7 +262,38 @@ async function inspectListing(candidate, marketCode) {
   if (!(Number(draft.lengthCm) > 0 && Number(draft.widthCm) > 0 && Number(draft.heightCm) > 0)) {
     warnings.push('포장 가로·세로·높이가 모두 입력되진 않았어. 카테고리/물류 정책상 필요할 수 있어.');
   }
-  if (!String(draft.brandName || '').trim()) warnings.push('브랜드가 비어 있어. 카테고리에 따라 필수일 수 있어.');
+  try {
+    const brandData = await getShopApi('/api/v2/product/get_brand_list', {
+      shopId: shop.shop_id,
+      accessToken,
+      params: {
+        category_id: Number(draft.categoryId),
+        offset: 0,
+        page_size: 100,
+        status: 1,
+        language: 'en'
+      }
+    });
+    const brandRoot = brandData?.response || brandData || {};
+    const brandList = extractBrandList(brandData);
+    metadata.brand = {
+      isMandatory: Boolean(brandRoot?.is_mandatory),
+      count: brandList.length
+    };
+    if (metadata.brand.isMandatory) {
+      const selectedId = Number(draft.brandId);
+      const selectedName = String(draft.brandOriginalName || draft.brandName || '').trim();
+      if (!selectedName || !Number.isFinite(selectedId) || selectedId < 0) {
+        blockers.push('이 카테고리는 브랜드 정보가 필수야. Shopee 브랜드 목록에서 브랜드를 선택해줘.');
+      } else if (brandList.length && !brandList.some(b => Number(b?.brand_id) === selectedId)) {
+        blockers.push('선택한 브랜드가 현재 Shopee 브랜드 목록에 없어. 브랜드를 다시 불러와 선택해줘.');
+      }
+    } else if (!String(draft.brandName || '').trim()) {
+      warnings.push('브랜드가 비어 있어.');
+    }
+  } catch (error) {
+    warnings.push(`브랜드 목록 재확인 실패: ${error.message}`);
+  }
   if (!String(draft.gtin || '').trim()) warnings.push('GTIN/EAN/JAN이 비어 있어. 카테고리에 따라 요구될 수 있어.');
 
   return {
@@ -395,6 +435,37 @@ router.get('/listing/categories', async (req, res) => {
       }
     });
     res.json({ shop, tokenRefreshed: auth.refreshed, categoryList: data.category_list || data.response?.category_list || [], raw: data.response || data });
+  } catch (error) {
+    fail(res, error, 502);
+  }
+});
+
+router.get('/listing/brands', async (req, res) => {
+  if (!requireDb(res)) return;
+  try {
+    const shopId = Number(req.query.shopId);
+    const categoryId = Number(req.query.categoryId);
+    if (!shopId || !categoryId) throw new Error('shopId와 categoryId가 필요합니다.');
+    const auth = await getValidAccessToken(shopId);
+    const data = await getShopApi('/api/v2/product/get_brand_list', {
+      shopId,
+      accessToken: auth.accessToken,
+      params: {
+        category_id: categoryId,
+        offset: 0,
+        page_size: 100,
+        status: 1,
+        language: String(req.query.language || 'en').slice(0, 20)
+      }
+    });
+    const root = data?.response || data || {};
+    res.json({
+      brandList: extractBrandList(data),
+      isMandatory: Boolean(root?.is_mandatory),
+      inputType: root?.input_type || 'DROP_DOWN',
+      hasNextPage: Boolean(root?.has_next_page),
+      nextOffset: root?.next_offset ?? null
+    });
   } catch (error) {
     fail(res, error, 502);
   }
