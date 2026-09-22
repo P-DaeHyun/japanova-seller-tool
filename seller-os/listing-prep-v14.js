@@ -77,7 +77,11 @@ function applyDefaults(c,code){
   return d;
 }
 function touch(d){d.updatedAt=now();d.preflight=null;}
-function connectionsFor(code){return arr(state.listingStatus.connections).filter(x=>String(x.marketCode||'').toUpperCase()===code)}
+function connectionsFor(code){
+  return arr(state.listingStatus.connections)
+    .filter(x=>String(x.marketCode||'').toUpperCase()===code)
+    .sort((a,b)=>new Date(b.updatedAt||b.lastSyncAt||0)-new Date(a.updatedAt||a.lastSyncAt||0));
+}
 function selectedShop(d,code){return connectionsFor(code).find(x=>Number(x.shopId)===Number(d.selectedShopId))||null}
 function localPrice(n,cur){if(!(Number(n)>0))return '-';const decimals=['SGD','MYR','BRL'].includes(cur)?2:0;return `${Number(n).toLocaleString('ko-KR',{maximumFractionDigits:decimals})} ${cur}`}
 
@@ -263,7 +267,7 @@ function renderSandboxPublish(c,code,d){
 function renderEditor(){
   const c=candidate(),root=$('#editor');if(!c){root.innerHTML='<div class="empty">아직 후보상품이 없어.</div>';return}
   const code=state.market,m=market(code),p=plan(c,code),d=applyDefaults(c,code),g=gate(c,code),conns=connectionsFor(code),cats=state.categoryCache[String(d.selectedShopId||'')]||[];
-  if(!d.selectedShopId&&conns.length===1)d.selectedShopId=conns[0].shopId;
+  if(!d.selectedShopId&&conns.length)d.selectedShopId=conns[0].shopId;
   const r=clientReadiness(c,code);
   root.innerHTML=`
     <div class="gate ${g.length?'bad':''}">${g.length?`<b>등록 준비 잠금</b><ul>${g.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:`<b>검증 게이트 통과</b> · 이제 등록정보를 완성하고 최종검사를 실행할 수 있어.`}</div>
