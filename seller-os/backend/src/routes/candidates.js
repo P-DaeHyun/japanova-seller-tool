@@ -117,9 +117,22 @@ async function connectedShop(shopId) {
   return result.rows[0];
 }
 
+function shopeeEnvironment() {
+  return String(process.env.SHOPEE_ENV || 'sandbox').trim().toLowerCase();
+}
+
+function sandboxPublishEnabled() {
+  return shopeeEnvironment() === 'sandbox'
+    && String(process.env.SHOPEE_SANDBOX_PUBLISH_ENABLED || '').trim().toLowerCase() === 'true';
+}
+
+function productionPublishEnabled() {
+  return shopeeEnvironment() === 'production'
+    && String(process.env.SHOPEE_PUBLISH_ENABLED || '').trim().toLowerCase() === 'true';
+}
+
 function publishEnabled() {
-  return String(process.env.SHOPEE_ENV || '').toLowerCase() === 'production'
-    && String(process.env.SHOPEE_PUBLISH_ENABLED || '').toLowerCase() === 'true';
+  return sandboxPublishEnabled() || productionPublishEnabled();
 }
 
 function buildAddItemPayload(draft) {
@@ -254,14 +267,18 @@ router.get('/listing/status', async (_req, res) => {
        where status='CONNECTED'
        order by market_code nulls last, shop_id`
     );
-    const environment = process.env.SHOPEE_ENV || 'sandbox';
+    const environment = shopeeEnvironment();
     res.json({
       environment,
       publishMutationEnabled: publishEnabled(),
+      sandboxPublishEnabled: sandboxPublishEnabled(),
+      productionPublishEnabled: productionPublishEnabled(),
       mediaUploadEnabled: true,
       publishSafety: {
-        productionRequired: true,
-        serverSwitch: String(process.env.SHOPEE_PUBLISH_ENABLED || '').toLowerCase() === 'true',
+        sandboxOnlyForTesting: true,
+        productionStillLockedUnlessExplicitlyEnabled: true,
+        sandboxServerSwitch: String(process.env.SHOPEE_SANDBOX_PUBLISH_ENABLED || '').toLowerCase() === 'true',
+        productionServerSwitch: String(process.env.SHOPEE_PUBLISH_ENABLED || '').toLowerCase() === 'true',
         explicitConfirmationRequired: true,
         createItemStatus: 'UNLIST',
         duplicateProtection: 'durable_attempt_ledger'
@@ -393,10 +410,18 @@ router.post('/listing/publish', async (req, res) => {
   try {
     if (!candidateId) throw new Error('candidateId가 필요합니다.');
     if (!marketCode) throw new Error('marketCode가 필요합니다.');
-    if (String(req.body?.confirm || '') !== 'PUBLISH') throw new Error('실제 등록 확인값 PUBLISH가 필요합니다.');
-    if (String(req.body?.confirmText || '') !== `PUBLISH ${marketCode}`) throw new Error(`최종 확인란에 PUBLISH ${marketCode}를 정확히 입력해야 합니다.`);
-    if (String(process.env.SHOPEE_ENV || '').toLowerCase() !== 'production') return fail(res, new Error('Sandbox에서는 실제 상품 등록을 실행할 수 없습니다.'), 403);
-    if (!publishEnabled()) return fail(res, new Error('서버 실제등록 안전스위치가 꺼져 있습니다.'), 403);
+    const environment = shopeeEnvironment();
+    if (environment === 'sandbox') {
+      if (String(req.body?.confirm || '') !== 'SANDBOX_PUBLISH') throw new Error('Sandbox 등록 확인값 SANDBOX_PUBLISH가 필요합니다.');
+      if (String(req.body?.confirmText || '') !== `SANDBOX PUBLISH ${marketCode}`) throw new Error(`최종 확인란에 SANDBOX PUBLISH ${marketCode}를 정확히 입력해야 합니다.`);
+      if (!sandboxPublishEnabled()) return fail(res, new Error('Sandbox 상품등록 안전스위치가 꺼져 있습니다.'), 403);
+    } else if (environment === 'production') {
+      if (String(req.body?.confirm || '') !== 'PUBLISH') throw new Error('실제 등록 확인값 PUBLISH가 필요합니다.');
+      if (String(req.body?.confirmText || '') !== `PUBLISH ${marketCode}`) throw new Error(`최종 확인란에 PUBLISH ${marketCode}를 정확히 입력해야 합니다.`);
+      if (!productionPublishEnabled()) return fail(res, new Error('Production 실제등록 안전스위치가 꺼져 있습니다.'), 403);
+    } else {
+      return fail(res, new Error(`지원하지 않는 Shopee 환경입니다: ${environment}`), 403);
+    }
 
     const prepared = await withTransaction(async client => {
       const locked = await client.query(`select * from candidate_products where id=$1 for update`, [candidateId]);
@@ -457,6 +482,7 @@ router.post('/listing/publish', async (req, res) => {
       itemStatus: 'UNLIST',
       requestHash: prepared.requestHash,
       attemptId: prepared.attempt.id,
+      environment: shopeeEnvironment(),
       publishedAt: new Date().toISOString()
     };
 
@@ -477,9 +503,9 @@ router.post('/listing/publish', async (req, res) => {
     });
 
     res.json({
-      message: `Shopee 미게시(UNLIST) 상품을 생성했어. item_id=${itemId}`,
+      message: `${shopeeEnvironment() === 'sandbox' ? 'Shopee Sandbox' : 'Shopee'} 미게시(UNLIST) 상품을 생성했어. item_id=${itemId}`,
       receipt,
-      mutation: { endpoint: '/api/v2/product/add_item', itemStatus: 'UNLIST' }
+      mutation: { endpoint: '/api/v2/product/add_item', itemStatus: 'UNLIST', environment: shopeeEnvironment() }
     });
   } catch (error) {
     fail(res, error, error?.httpStatus || 400);
