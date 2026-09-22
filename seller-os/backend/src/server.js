@@ -694,4 +694,12 @@ app.use((error, _req, res, _next) => {
   console.error(error);
   res.status(500).json(safeError(error));
 });
-app.listen(port, () => console.log(`JAPANOVA Seller OS Backend 시작: http://localhost:${port}`));
+app.listen(port, async () => {
+  console.log(`JAPANOVA Seller OS Backend 시작: http://localhost:${port}`);
+  try {
+    const diag = await diagnosePartnerCredentialHosts();
+    console.log('JAPANOVA Shopee partner 진단:', JSON.stringify(diag));
+  } catch (error) {
+    console.warn('JAPANOVA Shopee partner 진단 실패:', error.message);
+  }
+});
