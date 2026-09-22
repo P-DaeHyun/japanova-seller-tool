@@ -695,6 +695,19 @@ app.use((error, _req, res, _next) => {
   res.status(500).json(safeError(error));
 });
 
+
+async function runPublishLedgerDiagnostic() {
+  if (String(process.env.SHOPEE_PUBLISH_DIAGNOSTIC_ON_START || '').toLowerCase() !== 'true') return;
+  if (!hasDb()) return;
+  const result = await query(
+    `select candidate_id, market_code, shop_id, status, item_id, error_message, created_at, updated_at, finished_at
+     from listing_publish_attempts
+     order by created_at desc
+     limit 5`
+  );
+  console.log('JAPANOVA publish ledger diagnostic:', JSON.stringify(result.rows));
+}
+
 async function runSandboxAttributeDiagnostic() {
   if (String(process.env.SHOPEE_ATTRIBUTE_DIAGNOSTIC_ON_START || '').toLowerCase() !== 'true') return;
   if (getShopeeConfigStatus().environment !== 'sandbox' || !hasDb()) return;
@@ -788,6 +801,7 @@ app.listen(port, async () => {
     const diag = await diagnosePartnerCredentialHosts();
     console.log('JAPANOVA Shopee partner 진단:', JSON.stringify(diag));
     await runSandboxAttributeDiagnostic();
+    await runPublishLedgerDiagnostic();
   } catch (error) {
     console.warn('JAPANOVA Shopee partner 진단 실패:', error.message);
   }
