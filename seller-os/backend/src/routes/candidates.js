@@ -557,6 +557,19 @@ router.post('/listing/preflight', async (req, res) => {
   }
 });
 
+router.get('/listing/publish-status', async (req, res) => {
+  if (!requireDb(res)) return;
+  try {
+    const candidateId = String(req.query.candidateId || '').trim();
+    const marketCode = String(req.query.marketCode || '').trim().toUpperCase();
+    if (!candidateId || !marketCode) throw new Error('candidateId와 marketCode가 필요합니다.');
+    const attempt = await latestAttempt(candidateId, marketCode);
+    res.json({ attempt });
+  } catch (error) {
+    fail(res, error, 500);
+  }
+});
+
 router.post('/listing/publish', async (req, res) => {
   if (!requireDb(res)) return;
   const candidateId = String(req.body?.candidateId || '').trim();
