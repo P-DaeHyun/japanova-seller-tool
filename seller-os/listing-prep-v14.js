@@ -18,7 +18,7 @@ const fmt=(n,d=0)=>Number.isFinite(Number(n))?Number(n).toLocaleString('ko-KR',{
 const now=()=>new Date().toISOString();
 const uniq=(a)=>[...new Set(a)];
 const arr=(v)=>Array.isArray(v)?v:[];
-let state={candidates:[],selectedId:null,market:'TW',listingStatus:{environment:'unknown',connections:[]},categoryCache:{},attributeCache:{},brandCache:{},logisticsCache:{},busy:false};
+let state={candidates:[],selectedId:null,market:'TW',listingStatus:{environment:'unknown',connections:[]},categoryCache:{},attributeCache:{},brandCache:{},logisticsCache:{},publishAttemptCache:{},busy:false};
 
 async function api(path,opts={}){
   const headers={...(opts.headers||{})};
@@ -176,6 +176,20 @@ function buildPackage(c,code){
       :'상품 생성 mutation은 서버 안전스위치가 켜진 환경에서만 사용할 수 있습니다.'};
 }
 
+async function loadPublishAttempt(c,code){
+  if(!c)return null;
+  const key=`${c.id}:${code}`;
+  try{
+    const r=await api(`/api/candidates/listing/publish-status?candidateId=${encodeURIComponent(c.id)}&marketCode=${encodeURIComponent(code)}`);
+    state.publishAttemptCache[key]=r.attempt||null;
+    return state.publishAttemptCache[key];
+  }catch{
+    state.publishAttemptCache[key]=null;
+    return null;
+  }
+}
+function currentPublishAttempt(c,code){return state.publishAttemptCache[`${c?.id||''}:${code}`]||null}
+
 async function load(){
   const [cands,status]=await Promise.all([
     api('/api/candidates'),api('/api/candidates/listing/status').catch(()=>({environment:'backend-pending',publishMutationEnabled:false,connections:[]}))
@@ -183,6 +197,7 @@ async function load(){
   state.candidates=arr(cands.candidates);state.listingStatus=status||{};
   const ready=state.candidates.find(c=>c.status==='READY');state.selectedId=(ready||state.candidates[0]||{}).id||null;
   renderAll();
+  const c=candidate();if(c){await loadPublishAttempt(c,state.market);renderAll()}
 }
 async function seedSandboxCandidate(){
   if(state.busy)return;
@@ -224,7 +239,7 @@ function renderHeader(){
 }
 function renderMarketTabs(){
   const c=candidate();$('#marketTabs').innerHTML=MARKETS.map(m=>{const d=c?draft(c,m.code):null;const r=c?clientReadiness(c,m.code):null;let label='대기';if(d?.preflight?.ready)label='최종검사 통과';else if(r?.ready)label='검사 가능';else if(d?.enabled)label='작성중';return `<button class="marketTab ${state.market===m.code?'on':''}" data-market="${m.code}">${m.name}<small>${label}${m.future?' · 향후':''}</small></button>`}).join('');
-  $$('#marketTabs [data-market]').forEach(b=>b.onclick=()=>{state.market=b.dataset.market;renderMarketTabs();renderEditor();renderSummary()});
+  $('#marketTabs [data-market]').forEach(b=>b.onclick=async()=>{state.market=b.dataset.market;renderMarketTabs();renderEditor();renderSummary();const c=candidate();if(c){await loadPublishAttempt(c,state.market);renderAll()}});
 }
 function renderAttributeFields(d){
   const metadata=state.attributeCache[attrCacheKey(d)]||[];
@@ -265,12 +280,19 @@ function renderSandboxPublish(c,code,d){
   const enabled=isSandbox&&state.listingStatus.sandboxPublishEnabled;
   const ready=Boolean(d.preflight?.ready);
   const receipt=d.publishReceipt;
-  if(receipt?.itemId){
-    return `<section class="cardInner"><div class="section-head"><div><h3>7. Sandbox 테스트 등록</h3><p>이 초안은 이미 등록 완료됐어.</p></div></div><div class="preflight ok"><b>✅ Sandbox item_id ${esc(receipt.itemId)}</b><p>상태: ${esc(receipt.itemStatus||'UNLIST')} · Shop ${esc(receipt.shopId||'')}</p></div></section>`;
+  const attempt=currentPublishAttempt(c,code);
+  if(receipt?.itemId || attempt?.status==='SUCCEEDED'){
+    const itemId=receipt?.itemId||attempt?.itemId;
+    return `<section class="cardInner"><div class="section-head"><div><h3>7. Sandbox 테스트 등록</h3><p>이 초안은 이미 등록 완료됐어.</p></div></div><div class="preflight ok"><b>✅ Sandbox item_id ${esc(itemId)}</b><p>상태: ${esc(receipt?.itemStatus||'UNLIST')} · Shop ${esc(receipt?.shopId||attempt?.shopId||'')}</p></div></section>`;
   }
   const phrase=`SANDBOX PUBLISH ${code}`;
+  const attemptBox=attempt
+    ? `<div class="preflight ${attempt.status==='REVIEW'?'bad':'idle'}"><b>${attempt.status==='REVIEW'?'⛔ 이전 등록 시도 실패':attempt.status==='PENDING'?'⏳ 등록 처리 중':'등록 시도 기록'}</b><p>${esc(attempt.errorMessage||attempt.status||'')}</p></div>`
+    : '<div class="preflight idle"><b>아직 등록 시도 결과 없음</b></div>';
   return `<section class="cardInner"><div class="section-head"><div><h3>7. Sandbox 테스트 등록</h3><p>Shopee Sandbox에 미게시(UNLIST) 테스트 상품 1개를 실제 생성해 API 흐름을 검증해.</p></div></div>
     <div class="gate ${enabled?'':'bad'}">${enabled?'<b>Sandbox add_item 안전스위치 ON</b> · Production에는 절대 등록되지 않아.':'<b>Sandbox add_item 잠금</b> · 서버 안전스위치가 꺼져 있어.'}</div>
+    ${attemptBox}
+    <div id="sandboxPublishStatus" class="tiny rowGap"></div>
     <label>최종 확인문구<input id="sandboxConfirm" class="input" placeholder="${esc(phrase)}" autocomplete="off"></label>
     <div class="tiny rowGap">정확히 <b>${esc(phrase)}</b> 를 입력해야 버튼이 활성화돼. 서버 최종검사를 통과한 초안만 등록 가능하고, 중복 등록 방지 원장도 적용돼.</div>
     <div class="actions rowGap"><button class="btn" id="sandboxPublish" disabled>대만 Sandbox에 UNLIST 테스트 상품 등록</button></div>
@@ -447,11 +469,20 @@ async function publishSandbox(c,code,d,confirmText){
   if(confirmText!==phrase)return flash(`확인문구를 정확히 입력해줘: ${phrase}`,'warn');
   if(!window.confirm(`${market(code).name} Sandbox에 UNLIST 테스트 상품 1개를 실제 생성할까?\nProduction 상점에는 영향 없어.`))return;
   state.busy=true;
+  const statusEl=$('#sandboxPublishStatus'),btn=$('#sandboxPublish');
+  if(statusEl)statusEl.textContent='Shopee Sandbox에 등록 요청 중...';
+  if(btn){btn.disabled=true;btn.textContent='등록 요청 중...'}
   try{
     const r=await api('/api/candidates/listing/publish',{method:'POST',body:{candidateId:c.id,marketCode:code,confirm:'SANDBOX_PUBLISH',confirmText:phrase}});
+    await loadPublishAttempt(c,code);
     flash(r.message||'Sandbox 테스트 상품을 생성했어.');
     await load();
-  }catch(e){flash(e.message,'bad')}finally{state.busy=false}
+  }catch(e){
+    await loadPublishAttempt(c,code);
+    if(statusEl)statusEl.textContent=`등록 실패: ${e.message}`;
+    renderAll();
+    flash(e.message,'bad');
+  }finally{state.busy=false}
 }
 function renderSummary(){
   const c=candidate(),body=$('#packageRows');if(!c){body.innerHTML='<tr><td colspan="8" class="empty">후보상품이 없어.</td></tr>';return}
@@ -459,7 +490,7 @@ function renderSummary(){
 }
 function renderAll(){renderMetrics();renderCandidateSelect();renderHeader();renderMarketTabs();renderEditor();renderSummary()}
 
-$('#candidateSelect').onchange=e=>{state.selectedId=e.target.value;renderAll()};
+$('#candidateSelect').onchange=async e=>{state.selectedId=e.target.value;renderAll();const c=candidate();if(c){await loadPublishAttempt(c,state.market);renderAll()}};
 $('#seedSandbox').onclick=()=>seedSandboxCandidate();
 $('#exportAll').onclick=()=>{const c=candidate();if(!c)return;saveBlob(`japanova-${c.id}-all-listing-packages.json`,{schema:'JAPANOVA_LISTING_BUNDLE_V2',generatedAt:now(),candidateId:c.id,candidateName:c.name,packages:Object.fromEntries(MARKETS.map(m=>[m.code,buildPackage(c,m.code)]))})};
 $('#navResearch').onclick=()=>location.href='./v11.html';$('#navValidation').onclick=()=>location.href='./v10.html';$('#navOps').onclick=()=>location.href='./v08.html';
