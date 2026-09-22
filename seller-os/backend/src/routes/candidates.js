@@ -225,6 +225,7 @@ async function inspectListing(candidate, marketCode) {
   let availableLogisticIds = [];
   let tokenRefreshed = false;
   let accessToken = null;
+  let brandMetadata = null;
 
   if (draft.selectedShopId) {
     shop = await connectedShop(positiveId(draft.selectedShopId, 'selectedShopId'));
@@ -276,11 +277,11 @@ async function inspectListing(candidate, marketCode) {
     });
     const brandRoot = brandData?.response || brandData || {};
     const brandList = extractBrandList(brandData);
-    metadata.brand = {
+    brandMetadata = {
       isMandatory: Boolean(brandRoot?.is_mandatory),
       count: brandList.length
     };
-    if (metadata.brand.isMandatory) {
+    if (brandMetadata.isMandatory) {
       const selectedId = Number(draft.brandId);
       const selectedName = String(draft.brandOriginalName || draft.brandName || '').trim();
       if (!selectedName || !Number.isFinite(selectedId) || selectedId < 0) {
@@ -305,7 +306,7 @@ async function inspectListing(candidate, marketCode) {
     shop,
     tokenRefreshed,
     accessToken,
-    metadata: { mandatoryAttributeIds: mandatoryIds, availableLogisticIds }
+    metadata: { mandatoryAttributeIds: mandatoryIds, availableLogisticIds, brand: brandMetadata }
   };
 }
 
