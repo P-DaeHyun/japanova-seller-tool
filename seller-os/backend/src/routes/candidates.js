@@ -78,10 +78,12 @@ function logisticId(value) {
 
 function imageResult(data) {
   const root = data?.response || data || {};
-  const one = root.image_info || root.image || arr(root.image_list)[0] || arr(root.image_info_list)[0] || root;
+  const listEntry = arr(root.image_info_list)[0] || null;
+  const one = root.image_info || listEntry?.image_info || root.image || arr(root.image_list)[0] || listEntry || root;
+  const urlEntry = arr(one?.image_url_list)[0] || arr(root?.image_url_list)[0] || null;
   return {
     imageId: one?.image_id || root?.image_id || null,
-    imageUrl: one?.image_url || root?.image_url || null
+    imageUrl: one?.image_url || root?.image_url || urlEntry?.image_url || null
   };
 }
 
