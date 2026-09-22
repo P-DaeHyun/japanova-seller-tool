@@ -385,12 +385,22 @@ async function uploadImages(c,d){
 }
 async function runPreflight(c,code,d){
   if(state.busy)return;state.busy=true;
+  const btn=$('#runPreflight');
+  const before=btn?.textContent||'서버 최종검사 실행';
+  if(btn){btn.disabled=true;btn.textContent='서버 검사 중...'}
   try{
     const metadata=state.attributeCache[attrCacheKey(d)]||[];if(metadata.length)rebuildAttributes(d,metadata);
     await saveCandidate(c,{quiet:true});
     const r=await api('/api/candidates/listing/preflight',{method:'POST',body:{candidateId:c.id,marketCode:code}});
     d.preflight=r;await saveCandidate(c,{quiet:true});renderAll();flash(r.ready?(state.listingStatus.environment==='sandbox'&&state.listingStatus.sandboxPublishEnabled?'서버 최종검사를 통과했어. 이제 Sandbox 테스트 등록이 가능해.':'서버 최종검사를 통과했어. 상품등록은 현재 잠금 상태야.'):`최종검사에서 ${arr(r.blockers).length}개 차단 사유를 찾았어.`,r.ready?'ok':'warn');
-  }catch(e){flash(e.message,'bad')}finally{state.busy=false}
+  }catch(e){
+    d.preflight={checkedAt:now(),ready:false,blockers:[e.message],warnings:[]};
+    renderAll();
+    flash(e.message,'bad');
+  }finally{
+    state.busy=false;
+    const current=$('#runPreflight');if(current){current.disabled=false;current.textContent=before}
+  }
 }
 
 async function publishSandbox(c,code,d,confirmText){
