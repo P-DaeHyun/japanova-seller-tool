@@ -54,7 +54,8 @@ function draft(c,code){
   if(!d.description)d.description='';
   if(!d.sku)d.sku=baseSku(c,code);
   if(!(Number(d.priceLocal)>0)&&Number(p.plannedPrice)>0)d.priceLocal=Number(p.plannedPrice);
-  if(d.initialStock===undefined)d.initialStock=0;
+  if(d.initialStock===undefined)d.initialStock=Number(c.initialUnits||0);
+  if(code==='SG' && c.id==='SANDBOX-TEST-TW' && !(Number(d.initialStock)>0))d.initialStock=5;
   if(d.weightG===undefined)d.weightG=Number(c.weightG||0);
   if(d.lengthCm===undefined)d.lengthCm=Number(c.lengthCm||0);
   if(d.widthCm===undefined)d.widthCm=Number(c.widthCm||0);
