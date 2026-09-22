@@ -696,112 +696,11 @@ app.use((error, _req, res, _next) => {
 });
 
 
-async function runPublishLedgerDiagnostic() {
-  if (String(process.env.SHOPEE_PUBLISH_DIAGNOSTIC_ON_START || '').toLowerCase() !== 'true') return;
-  if (!hasDb()) return;
-  const result = await query(
-    `select candidate_id, market_code, shop_id, status, item_id, error_message, created_at, updated_at, finished_at
-     from listing_publish_attempts
-     order by created_at desc
-     limit 5`
-  );
-  console.log('JAPANOVA publish ledger diagnostic:', JSON.stringify(result.rows));
-}
-
-async function runSandboxAttributeDiagnostic() {
-  if (String(process.env.SHOPEE_ATTRIBUTE_DIAGNOSTIC_ON_START || '').toLowerCase() !== 'true') return;
-  if (getShopeeConfigStatus().environment !== 'sandbox' || !hasDb()) return;
-
-  const newest = await query(
-    `select shop_id, shop_name, market_code
-     from shopee_connections
-     where status='CONNECTED' and upper(coalesce(market_code,''))='TW'
-     order by updated_at desc, shop_id desc
-     limit 1`
-  );
-  if (!newest.rowCount) {
-    console.log('JAPANOVA attribute self-test: TW 연결 Shop 없음');
-    return;
-  }
-
-  const shopId = Number(newest.rows[0].shop_id);
-  const auth = await getValidAccessToken(shopId);
-  const path = [];
-
-  async function categories(parentCategoryId = null) {
-    const params = { language: 'en' };
-    if (parentCategoryId) params.parent_category_id = Number(parentCategoryId);
-    const data = await getShopApi('/api/v2/product/get_category', {
-      shopId,
-      accessToken: auth.accessToken,
-      params
-    });
-    return Array.isArray(data?.category_list)
-      ? data.category_list
-      : Array.isArray(data?.response?.category_list)
-        ? data.response.category_list
-        : [];
-  }
-
-  let list = await categories();
-  let leaf = null;
-  for (let depth = 0; depth < 8 && list.length; depth += 1) {
-    leaf = list.find(x => x?.has_children === false || x?.hasChildren === false) || list[0];
-    path.push({
-      id: Number(leaf?.category_id || leaf?.id || 0),
-      name: String(leaf?.display_category_name || leaf?.original_category_name || leaf?.category_name || leaf?.name || ''),
-      hasChildren: Boolean(leaf?.has_children ?? leaf?.hasChildren)
-    });
-    if (!path[path.length - 1].hasChildren) break;
-    list = await categories(path[path.length - 1].id);
-    leaf = null;
-  }
-
-  const categoryId = Number(leaf?.category_id || leaf?.id || path[path.length - 1]?.id || 0);
-  if (!categoryId) {
-    console.log('JAPANOVA attribute self-test:', JSON.stringify({ shopId, error: 'leaf category not found', path }));
-    return;
-  }
-
-  const data = await getShopApi('/api/v2/product/get_attribute_tree', {
-    shopId,
-    accessToken: auth.accessToken,
-    params: { category_id_list: String(categoryId), language: 'en' }
-  });
-  const responseList = Array.isArray(data?.response?.list) ? data.response.list : Array.isArray(data?.list) ? data.list : [];
-  const target = responseList.find(x => Number(x?.category_id) === categoryId) || responseList[0] || null;
-  const tree = Array.isArray(target?.attribute_tree)
-    ? target.attribute_tree
-    : Array.isArray(data?.attribute_list)
-      ? data.attribute_list
-      : Array.isArray(data?.response?.attribute_list)
-        ? data.response.attribute_list
-        : [];
-
-  console.log('JAPANOVA attribute self-test:', JSON.stringify({
-    shopId,
-    marketCode: newest.rows[0].market_code,
-    path,
-    categoryId,
-    topLevelKeys: Object.keys(data || {}),
-    responseKeys: Object.keys(data?.response || {}),
-    responseListCount: responseList.length,
-    attributeCount: tree.length,
-    firstAttributes: tree.slice(0, 5).map(x => ({
-      id: x?.attribute_id,
-      name: x?.name || x?.display_attribute_name || x?.attribute_name,
-      mandatory: Boolean(x?.mandatory ?? x?.is_mandatory)
-    }))
-  }));
-}
-
 app.listen(port, async () => {
   console.log(`JAPANOVA Seller OS Backend 시작: http://localhost:${port}`);
   try {
     const diag = await diagnosePartnerCredentialHosts();
     console.log('JAPANOVA Shopee partner 진단:', JSON.stringify(diag));
-    await runSandboxAttributeDiagnostic();
-    await runPublishLedgerDiagnostic();
   } catch (error) {
     console.warn('JAPANOVA Shopee partner 진단 실패:', error.message);
   }
