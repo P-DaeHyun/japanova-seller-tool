@@ -7,7 +7,9 @@ import { encryptSecret } from './tokenCrypto.js';
 import { fetchFxSnapshot } from './services/fx.js';
 import {
   buildAuthorizationUrl,
+  diagnosePartnerCredentialHosts,
   exchangeAuthorizationCode,
+  getShopeeConfigStatus,
   getShopApi,
   postShopApi,
   postShopApiFile,
@@ -146,6 +148,18 @@ app.post('/api/fx/refresh', async (req, res) => {
     }
     res.json({ message: '환율을 새로 갱신했습니다.', ...snapshot });
   } catch (error) { res.status(502).json(safeError(error)); }
+});
+
+app.get('/api/shopee/diagnostics', async (_req, res) => {
+  try {
+    const diagnostics = await diagnosePartnerCredentialHosts();
+    res.json(diagnostics);
+  } catch (error) {
+    res.status(500).json({
+      ...safeError(error),
+      config: getShopeeConfigStatus()
+    });
+  }
 });
 
 app.get('/api/shopee/authorize-url', (_req, res) => {
