@@ -258,6 +258,71 @@ async function inspectListing(candidate, marketCode) {
 
 router.use('/research', researchRouter);
 
+router.post('/listing/sandbox-test-candidate', async (_req, res) => {
+  if (!requireDb(res)) return;
+  try {
+    if (shopeeEnvironment() !== 'sandbox') {
+      return fail(res, new Error('Sandbox 환경에서만 테스트 후보를 만들 수 있습니다.'), 403);
+    }
+    const testId = 'SANDBOX-TEST-TW';
+    const existing = (await listCandidates()).find(x => String(x.id) === testId);
+    if (existing) {
+      return res.json({ message: '기존 Sandbox 테스트 후보를 사용해.', candidate: existing, created: false });
+    }
+    const candidate = await saveCandidate(testId, {
+      name: 'JAPANOVA Sandbox Test Item',
+      sourceUrl: '',
+      supplier: 'JAPANOVA TEST',
+      purchaseCostJpy: 500,
+      packagingCostJpy: 0,
+      domesticShippingJpy: 0,
+      otherCostJpy: 0,
+      weightG: 100,
+      lengthCm: 10,
+      widthCm: 8,
+      heightCm: 3,
+      discountPct: 0,
+      payoneerPct: 0,
+      fxBufferPct: 0,
+      targetMarginPct: 20,
+      initialUnits: 5,
+      status: 'READY',
+      note: 'Shopee Sandbox API add_item 검증용 테스트 후보. 실제 판매상품이 아님.',
+      plans: {
+        TW: {
+          regulationStatus: 'OK',
+          decision: 'SELL',
+          plannedPrice: 399,
+          listingDraft: {
+            enabled: true,
+            title: 'JAPANOVA Sandbox Test Item',
+            description: 'JAPANOVA Shopee Open API sandbox listing test item. This is not a real product for sale.',
+            sku: 'JNV-SANDBOX-TW-001',
+            priceLocal: 399,
+            initialStock: 5,
+            weightG: 100,
+            lengthCm: 10,
+            widthCm: 8,
+            heightCm: 3,
+            condition: 'NEW',
+            imageUrls: [],
+            imageIds: [],
+            imageUploads: [],
+            logistics: [],
+            attributes: [],
+            mandatoryAttributeIds: [],
+            attributeValues: {},
+            updatedAt: new Date().toISOString()
+          }
+        }
+      }
+    });
+    res.json({ message: '대만 Sandbox 테스트 후보를 만들었어.', candidate, created: true });
+  } catch (error) {
+    fail(res, error, 500);
+  }
+});
+
 router.get('/listing/status', async (_req, res) => {
   if (!requireDb(res)) return;
   try {
