@@ -186,6 +186,12 @@ function buildAddItemPayload(draft) {
   };
 }
 
+function itemFromBaseInfo(data, itemId) {
+  const root = data?.response || data || {};
+  const list = arr(root?.item_list || data?.item_list);
+  return list.find(x => Number(x?.item_id) === Number(itemId)) || list[0] || null;
+}
+
 function responseItemId(data) {
   const root = data?.response || data || {};
   const id = Number(root.item_id || data?.item_id || 0);
@@ -591,6 +597,74 @@ router.post('/listing/preflight', async (req, res) => {
     });
   } catch (error) {
     fail(res, error, 502);
+  }
+});
+
+router.post('/listing/item-verify', async (req, res) => {
+  if (!requireDb(res)) return;
+  try {
+    const candidateId = String(req.body?.candidateId || '').trim();
+    const marketCode = String(req.body?.marketCode || '').trim().toUpperCase();
+    if (!candidateId || !marketCode) throw new Error('candidateId와 marketCode가 필요합니다.');
+
+    const row = await query('select plans from candidate_products where id=$1', [candidateId]);
+    if (!row.rows[0]) return fail(res, new Error('후보상품을 찾을 수 없습니다.'), 404);
+
+    const plans = row.rows[0].plans && typeof row.rows[0].plans === 'object' ? row.rows[0].plans : {};
+    const draft = plans?.[marketCode]?.listingDraft || {};
+    const receipt = draft.publishReceipt || {};
+    const itemId = positiveId(receipt.itemId, 'Shopee item_id');
+    const shopId = positiveId(receipt.shopId || draft.selectedShopId, 'shopId');
+
+    const shop = await connectedShop(shopId);
+    if (String(shop.market_code || '').toUpperCase() !== marketCode) {
+      throw new Error(`등록 영수증 시장(${marketCode})과 연결 Shop 시장(${shop.market_code})이 달라.`);
+    }
+
+    const auth = await getValidAccessToken(shopId);
+    const data = await getShopApi('/api/v2/product/get_item_base_info', {
+      shopId,
+      accessToken: auth.accessToken,
+      params: { item_id_list: String(itemId) }
+    });
+    const item = itemFromBaseInfo(data, itemId);
+    if (!item) throw new Error(`Shopee에서 item_id ${itemId}를 다시 찾지 못했어.`);
+
+    const verification = {
+      verified: true,
+      verifiedAt: new Date().toISOString(),
+      itemId,
+      shopId,
+      itemStatus: String(item?.item_status || receipt.itemStatus || ''),
+      itemName: String(item?.item_name || ''),
+      itemSku: String(item?.item_sku || ''),
+      categoryId: Number(item?.category_id || 0) || null
+    };
+
+    await withTransaction(async client => {
+      const locked = await client.query('select plans from candidate_products where id=$1 for update', [candidateId]);
+      if (!locked.rows[0]) throw new Error('검증 결과 저장 중 후보상품을 찾을 수 없습니다.');
+      const currentPlans = locked.rows[0].plans && typeof locked.rows[0].plans === 'object' ? locked.rows[0].plans : {};
+      currentPlans[marketCode] = currentPlans[marketCode] || {};
+      currentPlans[marketCode].listingDraft = currentPlans[marketCode].listingDraft || {};
+      currentPlans[marketCode].listingDraft.publishReceipt = {
+        ...(currentPlans[marketCode].listingDraft.publishReceipt || {}),
+        verification
+      };
+      currentPlans[marketCode].listingDraft.updatedAt = new Date().toISOString();
+      await client.query(
+        'update candidate_products set plans=$2::jsonb, updated_at=now() where id=$1',
+        [candidateId, JSON.stringify(currentPlans)]
+      );
+    });
+
+    res.json({
+      message: `Shopee에서 item_id ${itemId}를 다시 조회해 생성 상태를 확인했어.`,
+      verification,
+      item
+    });
+  } catch (error) {
+    fail(res, error, error?.httpStatus || 400);
   }
 });
 
