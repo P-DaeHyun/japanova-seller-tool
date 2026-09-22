@@ -47,7 +47,7 @@ jobs:
           node --check src/routes/candidates.js
           node --check src/routes/research.js
           test -f ../db/candidates.sql
-          grep -q '"version": "1.5.0"' package.json
+          grep -q '"version": "1.6.0"' package.json
           grep -q 'multer' package.json
 
       - name: Check stable frontend JavaScript syntax
@@ -60,6 +60,7 @@ jobs:
           node --check ../listing-prep-v13.js
           node --check ../listing-prep-v14.js
           node --check ../listing-prep-v15.js
+          node --check ../listing-prep-v16.js
 
       - name: Check preview inline JavaScript syntax
         shell: bash
@@ -113,3 +114,6 @@ jobs:
           grep -q 'listing-prep-v15.js' ../v15.html
           grep -q '생성상품 API 재확인' ../listing-prep-v15.js
           grep -q '/listing/item-verify' src/routes/candidates.js
+          test -f ../v16.html
+          grep -q 'listing-prep-v16.js' ../v16.html
+          grep -q '후보상품 → 등록초안 자동생성' ../listing-prep-v16.js
