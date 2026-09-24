@@ -47,7 +47,7 @@ jobs:
           node --check src/routes/candidates.js
           node --check src/routes/research.js
           test -f ../db/candidates.sql
-          grep -q '"version": "2.1.3"' package.json
+          grep -q '"version": "2.1.4"' package.json
           grep -q 'multer' package.json
 
       - name: Check stable frontend JavaScript syntax
@@ -153,4 +153,5 @@ jobs:
           grep -q 'hydrateAttributeValuesFromSavedAttributes' ../listing-prep-v21.js
           grep -q 'selectedTexts' ../listing-prep-v21.js
           grep -q '기준속성 0개' ../listing-prep-v21.js
+          python -c 'from pathlib import Path; s=Path("../listing-prep-v21.js").read_text(); assert "$(\x27.attrSelect\x27).forEach" in s' # attrSelect runtime binding
           grep -q '공통속성 자동매칭' ../listing-prep-v21.js
