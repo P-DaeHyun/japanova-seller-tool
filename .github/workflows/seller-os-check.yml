@@ -47,7 +47,7 @@ jobs:
           node --check src/routes/candidates.js
           node --check src/routes/research.js
           test -f ../db/candidates.sql
-          grep -q '"version": "2.0.1"' package.json
+          grep -q '"version": "2.0.2"' package.json
           grep -q 'multer' package.json
 
       - name: Check stable frontend JavaScript syntax
@@ -142,4 +142,11 @@ jobs:
           grep -q '6개국 메타데이터 자동준비' ../v20.html
           grep -q 'prepareAllMarketMetadata' ../listing-prep-v20.js
           grep -q '미입력 필수만 보기' ../listing-prep-v20.js
+          # runtime category suggestion binding must use querySelectorAll helper
+          grep -Fq '$(\x27.categorySuggestion\x27).forEach' <(python - <<'PY'
+from pathlib import Path
+s=Path('../listing-prep-v20.js').read_text()
+print(s.replace("'", "\\x27"))
+PY
+) # querySelectorAll selector binding
           grep -q "\$\$('.categorySuggestion').forEach" ../listing-prep-v20.js
