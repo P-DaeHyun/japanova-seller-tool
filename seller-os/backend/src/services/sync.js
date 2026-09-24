@@ -10,6 +10,8 @@ import {
 const ACCESS_TOKEN_SAFETY_MS = 5 * 60 * 1000;
 const DEFAULT_PAYONEER_RATE = Number(process.env.PAYONEER_RATE || 0.02);
 
+function shopeeEnvironment(){ return String(process.env.SHOPEE_ENV || 'sandbox').trim().toLowerCase(); }
+
 function unixToDate(value) {
   const n = Number(value || 0);
   return n > 0 ? new Date(n * 1000) : null;
@@ -17,8 +19,8 @@ function unixToDate(value) {
 
 async function connection(shopId) {
   const result = await query(
-    `select * from shopee_connections where shop_id=$1`,
-    [Number(shopId)]
+    `select * from shopee_connections where shop_id=$1 and environment=$2`,
+    [Number(shopId), shopeeEnvironment()]
   );
   if (!result.rowCount) {
     throw new Error(`연결된 Shopee Shop을 찾을 수 없습니다: ${shopId}`);
@@ -64,13 +66,14 @@ export async function getValidAccessToken(shopId) {
          refresh_token_expires_at=$5,
          status='CONNECTED',
          updated_at=now()
-     where shop_id=$1`,
+     where shop_id=$1 and environment=$6`,
     [
       Number(shopId),
       encryptSecret(newAccessToken),
       encryptSecret(newRefreshToken),
       accessExpiresAt,
-      refreshExpiresAt
+      refreshExpiresAt,
+      shopeeEnvironment()
     ]
   );
 
@@ -153,8 +156,8 @@ export async function syncProductList(shopId) {
     }
 
     await query(
-      `update shopee_connections set last_sync_at=now(), updated_at=now() where shop_id=$1`,
-      [Number(shopId)]
+      `update shopee_connections set last_sync_at=now(), updated_at=now() where shop_id=$1 and environment=$2`,
+      [Number(shopId), shopeeEnvironment()]
     );
     await finishLog(logId, 'SUCCESS', `상품 ${synced}건 동기화`);
     return { synced, tokenRefreshed: auth.refreshed };
@@ -279,8 +282,8 @@ export async function syncOrders(shopId, { days = 7 } = {}) {
     }
 
     await query(
-      `update shopee_connections set last_sync_at=now(), updated_at=now() where shop_id=$1`,
-      [Number(shopId)]
+      `update shopee_connections set last_sync_at=now(), updated_at=now() where shop_id=$1 and environment=$2`,
+      [Number(shopId), shopeeEnvironment()]
     );
     await finishLog(logId, 'SUCCESS', `주문 ${unique.length}건 동기화`);
     return { synced: unique.length, orderSns: unique, tokenRefreshed: auth.refreshed };
