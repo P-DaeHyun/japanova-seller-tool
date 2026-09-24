@@ -105,6 +105,45 @@ function logisticName(v){return String(v?.logistics_channel_name??v?.logistic_na
 function categoryId(v){return Number(v?.category_id??v?.id??0)}
 function categoryName(v){return String(v?.display_category_name??v?.original_category_name??v?.category_name??v?.name??`카테고리 ${categoryId(v)}`)}
 function categoryHasChildren(v){return Boolean(v?.has_children??v?.hasChildren)}
+function normText(v){return String(v||'').toLowerCase().normalize('NFKC').replace(/[^a-z0-9\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]+/g,' ').trim()}
+function srcMeta(c){return c?.plans?.__sourceMeta||{}}
+function categoryTokens(c){
+  const raw=[c?.name,srcMeta(c).category,srcMeta(c).brand].filter(Boolean).join(' ');
+  const out=normText(raw).split(/\s+/).filter(x=>x.length>=2);
+  const aliases=[];
+  const rules=[
+    [/洗顔|ビオレ|スキン|美容|化粧|フェイス|face|skin|cosmetic|beauty|cleans/i,['beauty','personal care','skincare','face','cleanser']],
+    [/シャンプ|ヘア|hair|shampoo|conditioner/i,['beauty','personal care','hair']],
+    [/文具|ペン|鉛筆|ノート|stationery|pen|pencil/i,['stationery','office','school']],
+    [/玩具|おもちゃ|ベイブレード|toy|beyblade/i,['toys','hobbies','games']],
+    [/食品|飲料|青汁|お茶|food|drink|beverage|tea/i,['food','beverages','groceries']],
+    [/生理|ナプキン|sanitary|feminine/i,['health','personal care','feminine']],
+    [/家電|充電|usb|電池|battery|electronic/i,['electronics','home appliances']]
+  ];
+  for(const [re,words] of rules)if(re.test(raw))aliases.push(...words);
+  return uniq([...out,...aliases].map(normText).filter(Boolean));
+}
+function categorySuggestionList(list,c){
+  const tokens=categoryTokens(c);
+  return arr(list).map(v=>{const name=normText(categoryName(v));let score=0;for(const t of tokens){if(name===t)score+=12;else if(name.includes(t)||t.includes(name))score+=6;else if(t.split(' ').some(p=>p.length>2&&name.includes(p)))score+=2}return {v,score}})
+    .filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,5)
+    .map(x=>({categoryId:categoryId(x.v),categoryName:categoryName(x.v),hasChildren:categoryHasChildren(x.v),score:x.score}));
+}
+function attrValuePresent(d,id){const x=d.attributeValues?.[String(id)]||{};return arr(x.valueIds).filter(Boolean).length>0||Boolean(String(x.text||'').trim())}
+function missingMandatoryCount(d){return arr(d.mandatoryAttributeIds).filter(id=>!attrValuePresent(d,id)).length}
+function prepStatus(c,code){
+  const p=plan(c,code),d=draft(c,code),issues=[];
+  if(market(code)?.future)return {key:'BLOCKED',label:'차단',issues:['향후 시장']};
+  if(p.regulationStatus!=='OK'||p.decision!=='SELL')return {key:'BLOCKED',label:'차단',issues:['판매대상 아님']};
+  if(!connectionsFor(code).length)return {key:'BLOCKED',label:'차단',issues:['연결 Shop 없음']};
+  if(!d.selectedShopId)issues.push('Shop 선택');
+  if(!(Number(d.categoryId)>0))issues.push('카테고리 확인');
+  const miss=missingMandatoryCount(d);if(miss)issues.push('필수속성 '+miss+'개');
+  if(d.brandMandatory&&!d.brandId)issues.push('브랜드 확인');
+  if(!d.logistics.length)issues.push('물류 확인');
+  if(!d.imageIds.length)issues.push('Media 이미지 업로드');
+  return issues.length?{key:'CONFIRM',label:'확인필요',issues}:{key:'COMPLETE',label:'완료',issues:[]};
+}
 
 function gate(c,code){
   const p=plan(c,code),m=market(code),blocks=[];
