@@ -47,7 +47,7 @@ jobs:
           node --check src/routes/candidates.js
           node --check src/routes/research.js
           test -f ../db/candidates.sql
-          grep -q '"version": "2.2.1"' package.json
+          grep -q '"version": "2.3.0"' package.json
           grep -q 'multer' package.json
 
       - name: Check stable frontend JavaScript syntax
@@ -67,6 +67,7 @@ jobs:
           node --check ../listing-prep-v20.js
           node --check ../listing-prep-v21.js
           node --check ../listing-prep-v22.js
+          node --check ../listing-prep-v23.js
           node --check ../sourcing-v2.js
           node --check ../sourcing-v1.js
 
@@ -163,3 +164,10 @@ jobs:
           grep -q '자동 기준시장' ../listing-prep-v22.js
           grep -q 'sandboxSemanticMetadataBlocked' ../listing-prep-v22.js
           grep -q 'Sandbox 테스트 속성' ../listing-prep-v22.js
+          test -f ../v23.html
+          grep -q 'listing-prep-v23.js' ../v23.html
+          grep -q 'Production 6개국 실제 메타데이터 읽기' ../v23.html
+          grep -q 'prepareProductionReadOnlyMetadata' ../listing-prep-v23.js
+          grep -q 'resetEnvironmentBoundDraft' ../listing-prep-v23.js
+          grep -q 'SHOPEE_READ_ONLY' src/routes/candidates.js
+          grep -q 'environment text not null default' ../db/schema.sql
