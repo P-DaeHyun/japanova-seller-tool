@@ -146,12 +146,19 @@ async function saveAndOpenListing(){
   let saved=await saveCandidate({quiet:true});if(!saved)return;
   const stats=candidateStats(saved);
   if(!stats.sell)return flash('아직 판매 후보로 확정된 국가가 없어. 최소 한 국가에서 규제=판매가능 후 경쟁가/판매가를 검증해줘.','warn');
-  if(saved.status!=='READY'){saved.status='READY';saved=await persistCandidate(saved,{silent:true})}
   const preferred=sourceMeta(saved).primaryMarket||'TW';
   const sellCodes=stats.rows.filter(x=>x.final.key==='SELL').map(x=>x.m.code);
   const code=sellCodes.includes(preferred)?preferred:sellCodes[0];
-  location.href=`./latest.html?candidateId=${encodeURIComponent(saved.id)}&market=${encodeURIComponent(code)}`;
+  const targetPlan=planOf(saved,code);
+  targetPlan.decision='SELL';
+  targetPlan.listingDraft=targetPlan.listingDraft||{};
+  targetPlan.listingDraft.enabled=true;
+  saved.status='READY';
+  saved=await persistCandidate(saved,{silent:true});
+  flash(`${meta(code).name}을 판매대상(SELL)으로 확정하고 Shopee 등록초안으로 넘겨.`);
+  setTimeout(()=>{location.href=`./latest.html?candidateId=${encodeURIComponent(saved.id)}&market=${encodeURIComponent(code)}`},250);
 }
+
 function newCandidate(){state.selectedId=null;fillForm(null);$('#validation').innerHTML='<div class="empty">후보상품을 저장하면 국가별 검증표가 만들어져.</div>';$('#capitalBox').innerHTML='<div class="empty">후보상품을 선택해.</div>'}
 function openCandidate(id){state.selectedId=id;fillForm(selected());renderList();renderValidation();renderCapital()}
 async function deleteCandidate(){const c=selected();if(!c)return;if(!confirm(`“${c.name}” 후보를 삭제할까?`))return;if(state.dbStorage){try{await api(`/api/candidates/${encodeURIComponent(c.id)}`,{method:'DELETE'})}catch(e){return flash(`DB 삭제 실패: ${e.message}`,'bad')}}state.candidates=state.candidates.filter(x=>x.id!==c.id);state.selectedId=null;saveLocal();renderAll();newCandidate();flash('후보상품을 삭제했어.')}
