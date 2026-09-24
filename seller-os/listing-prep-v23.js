@@ -605,7 +605,7 @@ async function prepareAllListingDrafts(c){
   if(!codes.length)return flash('판매가능(OK) + 판매대상(SELL)으로 확정된 국가가 없어.','warn');
   const prepared=[];
   for(const code of codes){
-    const p=plan(c,code),d=applyDefaults(c,code);
+    const p=plan(c,code),d=applyDefaults(c,code);resetEnvironmentBoundDraft(d,currentShopeeEnv());
     d.enabled=true;
     d.title=d.title||c.name||'';
     d.description=d.description||defaultDescription(c,code);
@@ -650,7 +650,7 @@ async function prepareAllMarketMetadata(c){
   let done=0,confirm=0,blocked=0;
   try{
     for(let i=0;i<codes.length;i++){
-      const code=codes[i],d=applyDefaults(c,code),conns=connectionsFor(code);
+      const code=codes[i],d=applyDefaults(c,code),conns=connectionsFor(code);resetEnvironmentBoundDraft(d,currentShopeeEnv());stampEnvironmentMetadata(d);
       flash('6개국 자동준비 '+(i+1)+'/'+codes.length+' · '+market(code).name,'warn');
       if(!d.selectedShopId&&conns.length===1)d.selectedShopId=Number(conns[0].shopId);
       if(!d.selectedShopId){blocked++;continue}
