@@ -211,6 +211,7 @@ async function ensureAttributeMetadata(c,code,d){
   const list=arr(r.attributeList);state.attributeCache[key]=list;state.brandCache[key]=brandR||{brandList:[],isMandatory:false};
   d.attributeMeta=list.map(x=>({id:attrId(x),name:attrName(x),mandatory:attrMandatory(x),inputType:attrInputType(x)}));
   d.brandMandatory=Boolean(brandR?.isMandatory);
+  hydrateAttributeValuesFromSavedAttributes(d,list);
   if(!d.brandId){
     const wanted=normText(String(srcMeta(c).brand||MARKETS.map(m=>draft(c,m.code).brandName).find(Boolean)||''));
     if(wanted){
@@ -293,6 +294,36 @@ function gate(c,code){
   if((p.regulationStatus||'UNCHECKED')!=='OK')blocks.push('국가별 규제 상태가 판매가능(OK)이 아니야.');
   if((p.decision||'AUTO')!=='SELL')blocks.push('검증센터에서 이 국가를 판매대상(SELL)으로 확정하지 않았어.');
   return blocks;
+}
+function hydrateAttributeValuesFromSavedAttributes(d,metadata){
+  if(!d.attributeValues||typeof d.attributeValues!=='object'||Array.isArray(d.attributeValues))d.attributeValues={};
+  const metaMap=new Map(arr(metadata).map(m=>[String(attrId(m)),m]));
+  for(const row of arr(d.attributes)){
+    const id=String(row?.attribute_id??row?.attributeId??'');if(!id)continue;
+    if(attrValuePresent(d,id))continue;
+    const vals=arr(row?.attribute_value_list??row?.attributeValueList);
+    if(!vals.length)continue;
+    const meta=metaMap.get(id),options=attrOptions(meta);
+    const optionIds=[],texts=[];
+    let unit='';
+    for(const v of vals){
+      const vid=String(v?.value_id??v?.valueId??'');
+      const name=String(v?.original_value_name??v?.display_value_name??v?.value_name??'').trim();
+      const u=String(v?.value_unit??v?.valueUnit??'').trim();if(u)unit=u;
+      if(vid&&vid!=='0')optionIds.push(vid);
+      else if(name)texts.push(name);
+    }
+    if(optionIds.length){
+      d.attributeValues[id]={valueIds:isMultiAttr(meta)?uniq(optionIds):uniq(optionIds).slice(0,1),text:''};
+    }else if(texts.length){
+      d.attributeValues[id]={valueIds:[],text:texts.join(', '),...(unit?{unit}:{})};
+    }else if(options.length){
+      const names=vals.map(v=>String(v?.original_value_name??v?.display_value_name??v?.value_name??'').trim()).filter(Boolean);
+      const matched=names.map(name=>exactOptionMatch(options,name)).filter(Boolean).map(optionId).filter(Boolean);
+      if(matched.length)d.attributeValues[id]={valueIds:isMultiAttr(meta)?uniq(matched):uniq(matched).slice(0,1),text:''};
+    }
+  }
+  return d.attributeValues;
 }
 function rebuildAttributes(d,metadata){
   const out=[];
@@ -493,6 +524,7 @@ async function prepareAllMarketMetadata(c){
           state.attributeCache[attrCacheKey(d)]=attrs;state.brandCache[attrCacheKey(d)]=br||{brandList:[],isMandatory:false};
           d.attributeMeta=attrs.map(x=>({id:attrId(x),name:attrName(x),mandatory:attrMandatory(x)}));
           d.brandMandatory=Boolean(br?.isMandatory);
+          hydrateAttributeValuesFromSavedAttributes(d,attrs);
           const wanted=normText(sourceBrand||d.brandName||MARKETS.map(m=>draft(c,m.code).brandName).find(Boolean)||'');
           if(!d.brandId&&wanted){
             const match=brands.find(b=>{const n=normText(b.display_brand_name||b.original_brand_name||'');return n===wanted||(wanted.length>2&&(n.includes(wanted)||wanted.includes(n)))});
@@ -784,6 +816,7 @@ async function loadAttributes(c,code,d){
       const match=brands.find(b=>{const n=normText(b.display_brand_name||b.original_brand_name||'');return n===wantedBrand||(wantedBrand.length>2&&(n.includes(wantedBrand)||wantedBrand.includes(n)))});
       if(match){d.brandId=Number(match.brand_id);d.brandName=String(match.display_brand_name||match.original_brand_name||'');d.brandOriginalName=String(match.original_brand_name||match.display_brand_name||'')}
     }
+    hydrateAttributeValuesFromSavedAttributes(d,list);
     if(d.brandMandatory && !d.brandId){
       const noBrand=brands.find(b=>/^(no brand|無品牌|無牌|none)$/i.test(String(b.display_brand_name||b.original_brand_name||'').trim()));
       const auto=noBrand||(brands.length===1?brands[0]:null);
