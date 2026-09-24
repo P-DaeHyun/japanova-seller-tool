@@ -83,6 +83,53 @@ function applyDefaults(c,code){
   return d;
 }
 function touch(d){d.updatedAt=now();d.preflight=null;}
+function currentShopeeEnv(){return String(state.listingStatus?.environment||'unknown').toLowerCase()}
+function hasEnvironmentBoundMetadata(d){
+  return Boolean(d.selectedShopId||d.categoryId||d.brandId||arr(d.logistics).length||arr(d.attributes).length||arr(d.imageIds).length||d.preflight||d.publishReceipt);
+}
+function resetEnvironmentBoundDraft(d,targetEnv){
+  const env=String(targetEnv||currentShopeeEnv()||'unknown').toLowerCase();
+  const previous=d.metadataEnvironment||((hasEnvironmentBoundMetadata(d)&&env==='production')?'legacy-sandbox':env);
+  if(previous===env){d.metadataEnvironment=env;return false}
+  d.environmentArchives=arr(d.environmentArchives);
+  d.environmentArchives.push({
+    environment:previous,
+    shopId:d.selectedShopId||null,
+    categoryId:d.categoryId||null,
+    categoryName:d.categoryName||'',
+    publishReceipt:d.publishReceipt||null,
+    archivedAt:now()
+  });
+  d.environmentArchives=d.environmentArchives.slice(-4);
+  d.selectedShopId=null;
+  d.categoryId='';
+  d.categoryName='';
+  d.categorySuggestions=[];
+  d.attributes=[];
+  d.attributeMeta=[];
+  d.mandatoryAttributeIds=[];
+  d.attributeValues={};
+  d.brandId='';
+  d.brandName='';
+  d.brandOriginalName='';
+  d.brandMandatory=false;
+  d.logistics=[];
+  d.imageIds=[];
+  d.imageUploads=[];
+  d.preflight=null;
+  d.publishReceipt=null;
+  d.autoAttributeMatches=[];
+  d.autoAttributePending=[];
+  d.autoAttributeReference=null;
+  d.metadataEnvironment=env;
+  touch(d);
+  return true;
+}
+function stampEnvironmentMetadata(d){
+  const env=currentShopeeEnv();
+  if(env&&env!=='unknown')d.metadataEnvironment=env;
+}
+
 function connectionsFor(code){
   return arr(state.listingStatus.connections)
     .filter(x=>String(x.marketCode||'').toUpperCase()===code)
