@@ -578,6 +578,15 @@ function renderAttributeFields(d){
     return `<div class="attrCard ${required?'required':''}"><div class="attrHead"><b>${esc(attrName(meta))}</b><span>${required?'필수':'선택'} · ID ${esc(id)}</span></div>${field}<div class="tiny">${esc(attrInputType(meta)||'자유입력/선택')}</div></div>`;
   }).join(''):'<div class="empty smallEmpty">미입력 필수속성이 없어.</div>'}</div>`;
 }
+function renderAttributeMatchInfo(d){
+  const matches=arr(d.autoAttributeMatches),pending=arr(d.autoAttributePending);
+  if(!matches.length&&!pending.length)return '';
+  return `<div class="metaBox"><b>공통속성 자동매칭</b> · 자동입력 ${matches.length} · 확인필요 ${pending.length}
+    ${matches.length?`<div class="chips">${matches.slice(0,8).map(x=>`<span>✓ ${esc(x.attributeName)} ← ${esc(x.sourceMarket)}</span>`).join('')}</div>`:''}
+    ${pending.length?`<div class="warnList">확인필요: ${pending.slice(0,6).map(x=>esc(x.attributeName)).join(' · ')}</div>`:''}
+    <div class="tiny">옵션명이 정확히 일치하거나 고유하게 대응되는 값만 자동입력해. 애매한 값은 비워둬.</div>
+  </div>`;
+}
 function renderImages(d){
   const uploads=d.imageUploads.length?d.imageUploads.map((x,i)=>`<div class="imageChip"><div><b>${esc(x.fileName||`이미지 ${i+1}`)}</b><small>${esc(x.imageId||'')}</small></div><button class="mini red" data-remove-image="${i}">삭제</button></div>`).join(''):'<div class="muted">아직 Shopee Media에 업로드된 이미지가 없어.</div>';
   return `<div class="uploadBox"><input id="imageFiles" class="input fileInput" type="file" accept="image/jpeg,image/png" multiple><button class="btn" id="uploadImages" ${d.selectedShopId?'':'disabled'}>선택 이미지 Shopee에 업로드</button><div class="tiny">JPG/JPEG/PNG · 파일당 최대 10MB · 전체 상품이미지 최대 9개. 업로드는 버튼을 눌렀을 때만 실행돼.</div></div><div class="imageList">${uploads}</div>`;
@@ -649,7 +658,7 @@ function renderEditor(){
       </div><div class="metaBox">현재 환경: <b>${esc(state.listingStatus.environment||'unknown')}</b><br>이 화면은 카테고리/속성/물류 조회와 이미지 Media 업로드만 하고 상품 생성은 하지 않아.</div></section>
     </div>
     <div class="section grid2">
-      <section class="cardInner"><div class="section-head"><div><h3>3. 카테고리 속성</h3><p>필수속성을 우선 정리하고, 이미 입력된 값은 숨겨서 남은 것만 볼 수 있어.</p></div><label class="tiny"><input id="missingOnly" type="checkbox" ${state.missingOnly[code]?'checked':''}> 미입력 필수만 보기</label></div>${renderAttributeFields(d)}</section>
+      <section class="cardInner"><div class="section-head"><div><h3>3. 카테고리 속성</h3><p>대만 등에서 이미 입력한 공통속성을 다른 국가의 같은 의미 속성에 고신뢰도로 재사용해.</p></div><div class="actions"><button class="mini" id="matchThisMarket" ${d.categoryId?'':'disabled'}>이 국가 공통속성 매칭</button><label class="tiny"><input id="missingOnly" type="checkbox" ${state.missingOnly[code]?'checked':''}> 미입력 필수만 보기</label></div></div>${renderAttributeMatchInfo(d)}${renderAttributeFields(d)}</section>
       <section class="cardInner"><div class="section-head"><div><h3>4. 물류 채널</h3><p>현재 연결 Shop에서 사용할 채널만 선택해.</p></div></div>${renderLogistics(d)}</section>
     </div>
     <div class="section grid2">
@@ -678,6 +687,7 @@ function bindEditor(c,code,d){
     d.categoryId=id;d.categoryName=x?categoryName(x):(arr(d.categorySuggestions).find(s=>Number(s.categoryId)===id)?.categoryName||'');d.categorySuggestions=[];d.attributes=[];d.mandatoryAttributeIds=[];d.attributeValues={};touch(d);
     await saveCandidate(c,{quiet:true});await loadAttributes(c,code,d);if(!state.logisticsCache[String(d.selectedShopId||'')])await loadLogistics(d);
   });
+  $('#matchThisMarket')?.addEventListener('click',()=>autoMatchCommonAttributes(c,{onlyCode:code}));
   $('#missingOnly')?.addEventListener('change',e=>{state.missingOnly[code]=Boolean(e.target.checked);renderEditor()});
   $('#categoryPick')?.addEventListener('change',async e=>{
     const id=Number(e.target.value||0);if(!id)return;
@@ -848,6 +858,7 @@ function renderAll(){renderMetrics();renderCandidateSelect();renderHeader();rend
 $('#candidateSelect').onchange=async e=>{state.selectedId=e.target.value;renderAll();const c=candidate();if(c){await loadPublishAttempt(c,state.market);renderAll()}};
 $('#prepareAllMarkets')?.addEventListener('click',()=>{const c=candidate();if(c)prepareAllListingDrafts(c)});
 $('#prepareMetadataAll')?.addEventListener('click',()=>{const c=candidate();if(c)prepareAllMarketMetadata(c)});
+$('#matchAttributesAll')?.addEventListener('click',()=>{const c=candidate();if(c)autoMatchCommonAttributes(c)});
 $('#seedSandbox').onclick=()=>seedSandboxCandidate();
 $('#exportAll').onclick=()=>{const c=candidate();if(!c)return;saveBlob(`japanova-${c.id}-all-listing-packages.json`,{schema:'JAPANOVA_LISTING_BUNDLE_V2',generatedAt:now(),candidateId:c.id,candidateName:c.name,packages:Object.fromEntries(MARKETS.map(m=>[m.code,buildPackage(c,m.code)]))})};
 $('#navResearch').onclick=()=>location.href='./sourcing.html';$('#navValidation').onclick=()=>location.href='./sourcing.html';$('#navOps').onclick=()=>location.href='./v08.html';
