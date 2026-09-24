@@ -144,13 +144,7 @@ jobs:
           grep -q 'prepareAllMarketMetadata' ../listing-prep-v20.js
           grep -q '미입력 필수만 보기' ../listing-prep-v20.js
           # runtime category suggestion binding must use querySelectorAll helper
-          grep -Fq '$(\x27.categorySuggestion\x27).forEach' <(python - <<'PY'
-from pathlib import Path
-s=Path('../listing-prep-v20.js').read_text()
-print(s.replace("'", "\\x27"))
-PY
-) # querySelectorAll selector binding
-          grep -q "\$\$('.categorySuggestion').forEach" ../listing-prep-v20.js
+          python -c 'from pathlib import Path; s=Path("../listing-prep-v20.js").read_text(); assert "$(\x27.categorySuggestion\x27).forEach" in s'
           test -f ../v21.html
           grep -q 'listing-prep-v21.js' ../v21.html
           grep -q '6개국 공통속성 자동매칭' ../v21.html
