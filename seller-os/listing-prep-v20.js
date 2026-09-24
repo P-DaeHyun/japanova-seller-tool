@@ -307,6 +307,66 @@ async function prepareAllListingDrafts(c){
   }catch(e){flash(e.message,'bad')}finally{state.busy=false}
 }
 
+async function prepareAllMarketMetadata(c){
+  if(state.busy)return;
+  if(!c||c.id==='SANDBOX-TEST-TW')return flash('실제 후보상품에서 실행해줘.','warn');
+  const codes=MARKETS.filter(m=>!m.future).map(m=>m.code).filter(code=>{const p=plan(c,code);return p.regulationStatus==='OK'&&p.decision==='SELL'});
+  if(!codes.length)return flash('판매가능(OK) + 판매대상(SELL) 국가가 없어.','warn');
+  state.busy=true;
+  const jan=String(srcMeta(c).jan||'').trim();
+  const sourceBrand=String(srcMeta(c).brand||'').trim();
+  const allImageUrls=uniq(MARKETS.flatMap(m=>{const d=draft(c,m.code);return [...arr(d.imageUrls),...arr(d.imageUploads).map(x=>x?.imageUrl).filter(Boolean)]}).map(x=>String(x||'').trim()).filter(Boolean)).slice(0,9);
+  let done=0,confirm=0,blocked=0;
+  try{
+    for(let i=0;i<codes.length;i++){
+      const code=codes[i],d=applyDefaults(c,code),conns=connectionsFor(code);
+      flash('6개국 자동준비 '+(i+1)+'/'+codes.length+' · '+market(code).name,'warn');
+      if(!d.selectedShopId&&conns.length===1)d.selectedShopId=Number(conns[0].shopId);
+      if(!d.selectedShopId){blocked++;continue}
+      if(jan&&!String(d.gtin||'').trim())d.gtin=jan;
+      if(allImageUrls.length&&!d.imageUrls.length)d.imageUrls=[...allImageUrls];
+      if(Number(c.weightG)>0)d.weightG=Number(c.weightG);
+      if(Number(c.lengthCm)>0)d.lengthCm=Number(c.lengthCm);
+      if(Number(c.widthCm)>0)d.widthCm=Number(c.widthCm);
+      if(Number(c.heightCm)>0)d.heightCm=Number(c.heightCm);
+      try{
+        const lr=await api('/api/candidates/listing/logistics?shopId='+encodeURIComponent(d.selectedShopId));
+        const channels=arr(lr.logisticsChannels);state.logisticsCache[String(d.selectedShopId)]=channels;
+        const usable=channels.filter(x=>{const flag=x?.enabled??x?.is_enabled??x?.isEnabled??x?.status;if(flag===undefined||flag===null||flag==='')return true;if(typeof flag==='boolean')return flag;if(typeof flag==='number')return flag>0;return !/disable|inactive|closed|off/i.test(String(flag))});
+        if(!d.logistics.length&&usable.length===1){const id=logisticId(usable[0]);if(id)d.logistics=[id]}
+      }catch{}
+      if(!(Number(d.categoryId)>0)){
+        try{
+          const qs=new URLSearchParams({shopId:String(d.selectedShopId),language:'en'});
+          const cr=await api('/api/candidates/listing/categories?'+qs.toString());
+          const cats=arr(cr.categoryList);state.categoryCache[String(d.selectedShopId)]=cats;
+          d.categorySuggestions=categorySuggestionList(cats,c);
+        }catch{}
+      }else{
+        try{
+          const [ar,br]=await Promise.all([
+            api('/api/candidates/listing/attributes?shopId='+encodeURIComponent(d.selectedShopId)+'&categoryId='+encodeURIComponent(d.categoryId)+'&language=en'),
+            api('/api/candidates/listing/brands?shopId='+encodeURIComponent(d.selectedShopId)+'&categoryId='+encodeURIComponent(d.categoryId)+'&language=en').catch(()=>({brandList:[],isMandatory:false}))
+          ]);
+          const attrs=arr(ar.attributeList),brands=arr(br.brandList);
+          state.attributeCache[attrCacheKey(d)]=attrs;state.brandCache[attrCacheKey(d)]=br||{brandList:[],isMandatory:false};
+          d.attributeMeta=attrs.map(x=>({id:attrId(x),name:attrName(x),mandatory:attrMandatory(x)}));
+          d.brandMandatory=Boolean(br?.isMandatory);
+          const wanted=normText(sourceBrand||d.brandName||MARKETS.map(m=>draft(c,m.code).brandName).find(Boolean)||'');
+          if(!d.brandId&&wanted){
+            const match=brands.find(b=>{const n=normText(b.display_brand_name||b.original_brand_name||'');return n===wanted||(wanted.length>2&&(n.includes(wanted)||wanted.includes(n)))});
+            if(match){d.brandId=Number(match.brand_id);d.brandName=String(match.display_brand_name||match.original_brand_name||'');d.brandOriginalName=String(match.original_brand_name||match.display_brand_name||'')}
+          }
+          rebuildAttributes(d,attrs);
+        }catch{}
+      }
+      touch(d);
+      const st=prepStatus(c,code);if(st.key==='COMPLETE')done++;else if(st.key==='BLOCKED')blocked++;else confirm++;
+    }
+    await saveCandidate(c,{quiet:true});renderAll();
+    flash('6개국 자동준비 완료 · 완료 '+done+' · 확인필요 '+confirm+' · 차단 '+blocked+'. 카테고리 후보와 남은 필수속성만 확인해줘.',blocked?'warn':'ok');
+  }catch(e){flash(e.message,'bad')}finally{state.busy=false}
+}
 async function prepareListingDraftFromCandidate(c,code){
   if(state.busy)return;
   const p=plan(c,code),d=draft(c,code),m=market(code);
