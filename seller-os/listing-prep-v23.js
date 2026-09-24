@@ -638,6 +638,27 @@ async function prepareAllListingDrafts(c){
   }catch(e){flash(e.message,'bad')}finally{state.busy=false}
 }
 
+async function prepareProductionReadOnlyMetadata(c){
+  if(!c)return;
+  const env=currentShopeeEnv();
+  if(env!=='production')return flash('현재 백엔드는 아직 Sandbox야. Production Partner Key/인증으로 전환한 뒤 실제 6개국 메타데이터를 읽을 수 있어.','warn');
+  if(!state.listingStatus.readOnly)return flash('Production 읽기 전용 안전스위치가 켜져 있지 않아. 실제 메타데이터 조회를 시작하지 않았어.','bad');
+  if(!arr(state.listingStatus.connections).length)return flash('Production Shop 연결이 아직 없어. 먼저 Production Shop 인증을 완료해줘.','warn');
+  let reset=0;
+  for(const m of MARKETS.filter(x=>!x.future)){
+    const d=applyDefaults(c,m.code);
+    if(resetEnvironmentBoundDraft(d,'production'))reset++;
+    stampEnvironmentMetadata(d);
+  }
+  if(reset)await saveCandidate(c,{quiet:true});
+  flash('Production READ ONLY로 실제 Shop 카테고리·속성·브랜드·물류를 읽는 중이야. 상품 생성/이미지 업로드/출고는 잠겨 있어.','warn');
+  await prepareAllMarketMetadata(c);
+}
+function openProductionAuthorization(){
+  if(currentShopeeEnv()!=='production')return flash('백엔드가 Production 환경으로 전환된 뒤 인증할 수 있어.','warn');
+  location.href=API+'/api/shopee/authorize';
+}
+
 async function prepareAllMarketMetadata(c){
   if(state.busy)return;
   if(!c||c.id==='SANDBOX-TEST-TW')return flash('실제 후보상품에서 실행해줘.','warn');
