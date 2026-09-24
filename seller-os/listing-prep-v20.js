@@ -556,7 +556,7 @@ function bindEditor(c,code,d){
   $('#loadCategories')?.addEventListener('click',()=>loadCategories(d));
   $('#loadAttributes')?.addEventListener('click',()=>loadAttributes(c,code,d));
   $('#loadLogistics')?.addEventListener('click',()=>loadLogistics(d));
-  $('.categorySuggestion').forEach(btn=>btn.onclick=async()=>{
+  $$('.categorySuggestion').forEach(btn=>btn.onclick=async()=>{
     const id=Number(btn.dataset.categorySuggestion||0);if(!id)return;
     const x=(state.categoryCache[String(d.selectedShopId)]||[]).find(v=>categoryId(v)===id);
     if(x&&categoryHasChildren(x)){d.categorySuggestions=[];touch(d);await saveCandidate(c,{quiet:true});return loadCategories(d,id)}
