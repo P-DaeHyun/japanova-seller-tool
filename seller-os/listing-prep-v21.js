@@ -775,7 +775,7 @@ function bindEditor(c,code,d){
     d.brandMandatory=Boolean(meta.isMandatory);
     touch(d);await saveCandidate(c,{quiet:true});renderAll();
   });
-  $('.attrSelect').forEach(el=>el.onchange=async()=>{const id=String(el.dataset.attrId);const meta=(state.attributeCache[attrCacheKey(d)]||[]).find(x=>attrId(x)===id);const opts=[...el.selectedOptions].filter(o=>o.value);const vals=opts.map(o=>o.value);d.attributeValues[id]={valueIds:isMultiAttr(meta)?vals:vals.slice(0,1),selectedTexts:opts.map(o=>o.textContent.trim()),text:''};rebuildAttributes(d,state.attributeCache[attrCacheKey(d)]||[]);touch(d);await saveCandidate(c,{quiet:true});renderAll()});
+  $$('.attrSelect').forEach(el=>el.onchange=async()=>{const id=String(el.dataset.attrId);const meta=(state.attributeCache[attrCacheKey(d)]||[]).find(x=>attrId(x)===id);const opts=[...el.selectedOptions].filter(o=>o.value);const vals=opts.map(o=>o.value);d.attributeValues[id]={valueIds:isMultiAttr(meta)?vals:vals.slice(0,1),selectedTexts:opts.map(o=>o.textContent.trim()),text:''};rebuildAttributes(d,state.attributeCache[attrCacheKey(d)]||[]);touch(d);await saveCandidate(c,{quiet:true});renderAll()});
   $$('.attrText').forEach(el=>el.onchange=async()=>{const id=String(el.dataset.attrId);d.attributeValues[id]={valueIds:[],text:el.value.trim()};rebuildAttributes(d,state.attributeCache[attrCacheKey(d)]||[]);touch(d);await saveCandidate(c,{quiet:true});renderAll()});
   $$('.logisticCheck').forEach(el=>el.onchange=async()=>{d.logistics=$$('.logisticCheck:checked').map(x=>Number(x.value)).filter(Boolean);touch(d);await saveCandidate(c,{quiet:true});renderAll()});
   $('#uploadImages')?.addEventListener('click',()=>uploadImages(c,d));
