@@ -47,7 +47,7 @@ jobs:
           node --check src/routes/candidates.js
           node --check src/routes/research.js
           test -f ../db/candidates.sql
-          grep -q '"version": "2.1.2"' package.json
+          grep -q '"version": "2.1.3"' package.json
           grep -q 'multer' package.json
 
       - name: Check stable frontend JavaScript syntax
@@ -151,4 +151,6 @@ jobs:
           grep -q 'autoMatchCommonAttributes' ../listing-prep-v21.js
           grep -q 'ensureAttributeMetadata(c,sourceCode,sd)' ../listing-prep-v21.js # Reload saved attribute metadata
           grep -q 'hydrateAttributeValuesFromSavedAttributes' ../listing-prep-v21.js
+          grep -q 'selectedTexts' ../listing-prep-v21.js
+          grep -q '기준속성 0개' ../listing-prep-v21.js
           grep -q '공통속성 자동매칭' ../listing-prep-v21.js
