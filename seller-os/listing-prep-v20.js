@@ -509,8 +509,9 @@ function renderEditor(){
   const c=candidate(),root=$('#editor');if(!c){root.innerHTML='<div class="empty">아직 후보상품이 없어.</div>';return}
   const code=state.market,m=market(code),p=plan(c,code),d=applyDefaults(c,code),g=gate(c,code),conns=connectionsFor(code),cats=state.categoryCache[String(d.selectedShopId||'')]||[];
   if(!d.selectedShopId&&conns.length)d.selectedShopId=conns[0].shopId;
-  const r=clientReadiness(c,code);
+  const r=clientReadiness(c,code),ps=prepStatus(c,code),suggestions=arr(d.categorySuggestions);
   root.innerHTML=`
+    <div class="gate ${ps.key==='BLOCKED'?'bad':''}"><b>6개국 자동준비: ${ps.label}</b>${ps.issues.length?` · ${esc(ps.issues.join(' / '))}`:''}</div>
     <div class="gate ${g.length?'bad':''}">${g.length?`<b>등록 준비 잠금</b><ul>${g.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:`<b>검증 게이트 통과</b> · 이제 등록정보를 완성하고 최종검사를 실행할 수 있어.`}</div>
     <div class="switchRow"><div><b>${m.name} 등록 준비 대상</b><div class="tiny">실제 등록이 아니라 초안 준비 스위치야.</div></div><label><input id="enabled" type="checkbox" ${d.enabled?'checked':''}> 준비 ON</label></div>
     <div class="grid2">
@@ -527,7 +528,8 @@ function renderEditor(){
         <label class="full">등록 대상 Shop<select id="shop" class="select"><option value="">선택</option>${conns.map(x=>`<option value="${x.shopId}" ${Number(d.selectedShopId)===Number(x.shopId)?'selected':''}>${esc(x.shopName||'Shop')} · ${x.shopId}</option>`).join('')}</select></label>
         <label>카테고리 ID<input id="categoryId" class="input" type="number" min="1" value="${esc(d.categoryId||'')}"></label><label>카테고리명<input id="categoryName" class="input" value="${esc(d.categoryName||'')}"></label>
         <div class="full actions"><button class="btn ghost" id="loadCategories" ${d.selectedShopId?'':'disabled'}>카테고리 목록 불러오기</button><button class="btn ghost" id="loadAttributes" ${(d.selectedShopId&&d.categoryId)?'':'disabled'}>속성 불러오기</button><button class="btn ghost" id="loadLogistics" ${d.selectedShopId?'':'disabled'}>물류 불러오기</button></div>
-        ${cats.length?`<label class="full">불러온 카테고리<select id="categoryPick" class="select"><option value="">선택</option>${cats.map(x=>`<option value="${categoryId(x)}">${categoryHasChildren(x)?'▶ 하위 있음':'✓ 최종'} · ${esc(categoryName(x))} · ${categoryId(x)}</option>`).join('')}</select><span class="tiny">▶ 항목은 최종 카테고리가 아니야. 선택하면 하위 카테고리를 다시 불러와. ✓ 최종 항목을 골라야 속성을 불러올 수 있어.</span></label>`:''}
+        ${suggestions.length?`<div class="full metaBox"><b>JAPANOVA 카테고리 후보</b><div class="chips">${suggestions.map(x=>`<button class="mini categorySuggestion" data-category-suggestion="${x.categoryId}">${x.hasChildren?'▶':'✓'} ${esc(x.categoryName)}</button>`).join('')}</div><div class="tiny">상품명/소싱 카테고리 기반 후보야. 국가별 카테고리 ID가 다르므로 최종 카테고리까지 확인해.</div></div>`:''}
+        ${cats.length?`<label class="full">불러온 카테고리<select id="categoryPick" class="select"><option value="">선택</option>${cats.map(x=>`<option value="${categoryId(x)}">${categoryHasChildren(x)?'▶ 하위 있음':'✓ 최종'} · ${esc(categoryName(x))} · ${categoryId(x)}</option>`).join('')}</select><span class="tiny">▶ 항목은 최종 카테고리가 아니야. 선택하면 하위 카테고리를 다시 불러와. ✓ 최종 항목을 고르면 속성·브랜드를 이어서 확인해.</span></label>`:''}
       </div><div class="metaBox">현재 환경: <b>${esc(state.listingStatus.environment||'unknown')}</b><br>이 화면은 카테고리/속성/물류 조회와 이미지 Media 업로드만 하고 상품 생성은 하지 않아.</div></section>
     </div>
     <div class="section grid2">
