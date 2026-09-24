@@ -232,11 +232,42 @@ async function ensureAttributeMetadata(c,code,d){
   rebuildAttributes(d,list);
   return list;
 }
+function attributeReferenceStats(c,code){
+  const d=draft(c,code);
+  const facts=sourceAttributeFacts(c).filter(f=>f.sourceMarket===code);
+  const mandatoryIds=arr(d.mandatoryAttributeIds).map(String);
+  const filledMandatory=mandatoryIds.filter(id=>attrValuePresent(d,id)).length;
+  const metadataTotal=arr(d.attributeMeta).length;
+  return {
+    code,
+    name:market(code)?.name||code,
+    filled:facts.length,
+    filledMandatory,
+    mandatoryTotal:mandatoryIds.length,
+    metadataTotal,
+    preflight:Boolean(d.preflight?.ready),
+    finalCategory:Boolean(d.selectedShopId&&Number(d.categoryId)>0)
+  };
+}
+function selectAttributeReferenceMarket(c,codes){
+  const priority=['SG','TW','MY','TH','PH','VN'];
+  const stats=uniq(arr(codes)).map(code=>attributeReferenceStats(c,code)).filter(x=>x.finalCategory);
+  stats.sort((a,b)=>
+    b.filled-a.filled||
+    b.filledMandatory-a.filledMandatory||
+    Number(b.preflight)-Number(a.preflight)||
+    b.metadataTotal-a.metadataTotal||
+    priority.indexOf(a.code)-priority.indexOf(b.code)
+  );
+  const reference=stats[0]||null;
+  return {reference,stats,mode:reference?(reference.filled>0?'filled':'suggested'):'none'};
+}
 async function autoMatchCommonAttributes(c,{onlyCode=null}={}){
   if(state.busy)return;
   const eligible=MARKETS.filter(m=>!m.future).map(m=>m.code).filter(code=>{
     if(onlyCode&&code!==onlyCode)return false;
-    const p=plan(c,code),d=draft(c,code);return p.regulationStatus==='OK'&&p.decision==='SELL'&&d.selectedShopId&&Number(d.categoryId)>0;
+    const p=plan(c,code),d=draft(c,code);
+    return p.regulationStatus==='OK'&&p.decision==='SELL'&&d.selectedShopId&&Number(d.categoryId)>0;
   });
   if(!eligible.length)return flash('공통속성을 매칭할 최종 카테고리가 준비된 국가가 없어.','warn');
   state.busy=true;let applied=0,pending=0,commonFields=0;
@@ -248,8 +279,14 @@ async function autoMatchCommonAttributes(c,{onlyCode=null}={}){
       const sd=draft(c,sourceCode);
       try{await ensureAttributeMetadata(c,sourceCode,sd)}catch{}
     }
-    const facts=sourceAttributeFacts(c);
-    const sourceMarkets=uniq(facts.map(f=>f.sourceMarket));
+
+    const choice=selectAttributeReferenceMarket(c,prepared);
+    const reference=choice.reference;
+    if(!reference)return flash('기준시장으로 삼을 최종 카테고리 준비 국가가 없어.','warn');
+
+    const referenceCode=reference.code;
+    const facts=sourceAttributeFacts(c).filter(f=>f.sourceMarket===referenceCode);
+
     for(const code of eligible){
       const d=draft(c,code),metadata=await ensureAttributeMetadata(c,code,d);
       const common=[];
@@ -259,25 +296,62 @@ async function autoMatchCommonAttributes(c,{onlyCode=null}={}){
         if(!(Number(d[key])>0)&&Number(val)>0){d[key]=Number(val);common.push(label);commonFields++}
       }
       d.commonFieldMatches=common;
+      d.autoAttributeReference={
+        market:referenceCode,
+        marketName:reference.name,
+        filled:reference.filled,
+        filledMandatory:reference.filledMandatory,
+        mandatoryTotal:reference.mandatoryTotal,
+        metadataTotal:reference.metadataTotal,
+        mode:choice.mode,
+        selectedAt:now()
+      };
+
       const matches=[];const needs=[];
-      for(const meta of metadata){
-        const id=attrId(meta);if(!id||attrValuePresent(d,id))continue;
-        const key=canonicalAttrName(attrName(meta));
-        const candidates=facts.filter(f=>f.key===key&&f.sourceMarket!==code);
-        if(!candidates.length)continue;
-        const fact=candidates[0],result=applyFactToAttribute(d,meta,fact);
-        if(result.applied){
-          applied++;matches.push({attributeId:id,attributeName:attrName(meta),sourceMarket:fact.sourceMarket,sourceAttribute:fact.name,values:fact.values.map(v=>v.text),confidence:'high'});
-        }else{pending++;needs.push({attributeId:id,attributeName:attrName(meta),sourceMarket:fact.sourceMarket,sourceAttribute:fact.name,values:fact.values.map(v=>v.text),reason:result.reason||'confirm'});}
+      if(code!==referenceCode&&facts.length){
+        for(const meta of metadata){
+          const id=attrId(meta);if(!id||attrValuePresent(d,id))continue;
+          const key=canonicalAttrName(attrName(meta));
+          const fact=facts.find(f=>f.key===key);
+          if(!fact)continue;
+          const result=applyFactToAttribute(d,meta,fact);
+          if(result.applied){
+            applied++;
+            matches.push({
+              attributeId:id,
+              attributeName:attrName(meta),
+              sourceMarket:referenceCode,
+              sourceAttribute:fact.name,
+              values:fact.values.map(v=>v.text),
+              confidence:'high'
+            });
+          }else{
+            pending++;
+            needs.push({
+              attributeId:id,
+              attributeName:attrName(meta),
+              sourceMarket:referenceCode,
+              sourceAttribute:fact.name,
+              values:fact.values.map(v=>v.text),
+              reason:result.reason||'confirm'
+            });
+          }
+        }
       }
       d.autoAttributeMatches=matches;
       d.autoAttributePending=needs;
       if(metadata.length)rebuildAttributes(d,metadata);
       touch(d);
     }
-    await saveCandidate(c,{quiet:true});renderAll();
-    const sourceNote=facts.length?'기준속성 '+facts.length+'개('+sourceMarkets.join('/')+')':'기준속성 0개';
-    const msg='6개국 공통속성 자동매칭 완료 · '+sourceNote+' · 속성 자동입력 '+applied+'개 · 공통필드 '+commonFields+'개 · 확인필요 '+pending+'개.'+(facts.length?' 애매한 옵션은 자동입력하지 않았어.':' 현재 기준 국가 카테고리에 재사용할 속성값이 없어 JAN/중량/치수/브랜드 같은 공통필드만 처리했어.');
+
+    if(!facts.length&&!onlyCode)state.market=referenceCode;
+    await saveCandidate(c,{quiet:true});
+    renderAll();
+
+    const refSummary=reference.name+'('+referenceCode+') · 입력속성 '+reference.filled+'개 · 필수 '+reference.filledMandatory+'/'+reference.mandatoryTotal+' · 전체속성 '+reference.metadataTotal;
+    const msg=facts.length
+      ? '자동 기준시장 '+refSummary+' 선택 · 다른 국가 속성 자동입력 '+applied+'개 · 공통필드 '+commonFields+'개 · 확인필요 '+pending+'개.'
+      : '자동 기준시장 '+refSummary+' 선택 · 아직 입력된 기준속성이 0개야. 이 시장의 필수속성을 먼저 입력한 뒤 다시 누르면 나머지 국가로 전파해. 공통필드 '+commonFields+'개는 먼저 처리했어.';
     flash(msg,(pending||!facts.length)?'warn':'ok');
   }catch(e){flash(e.message,'bad')}finally{state.busy=false}
 }
@@ -645,12 +719,13 @@ function renderAttributeFields(d){
   }).join(''):'<div class="empty smallEmpty">미입력 필수속성이 없어.</div>'}</div>`;
 }
 function renderAttributeMatchInfo(d){
-  const matches=arr(d.autoAttributeMatches),pending=arr(d.autoAttributePending);
-  if(!matches.length&&!pending.length)return '';
-  return `<div class="metaBox"><b>공통속성 자동매칭</b> · 자동입력 ${matches.length} · 확인필요 ${pending.length}
+  const matches=arr(d.autoAttributeMatches),pending=arr(d.autoAttributePending),ref=d.autoAttributeReference||null;
+  if(!matches.length&&!pending.length&&!ref)return '';
+  const refText=ref?`<div><b>자동 기준시장</b> · ${esc(ref.marketName||ref.market)}(${esc(ref.market)}) · 입력속성 ${fmt(ref.filled||0)} · 필수 ${fmt(ref.filledMandatory||0)}/${fmt(ref.mandatoryTotal||0)} · 전체속성 ${fmt(ref.metadataTotal||0)}</div>`:'';
+  return `<div class="metaBox">${refText}<div><b>공통속성 자동매칭</b> · 자동입력 ${matches.length} · 확인필요 ${pending.length}</div>
     ${matches.length?`<div class="chips">${matches.slice(0,8).map(x=>`<span>✓ ${esc(x.attributeName)} ← ${esc(x.sourceMarket)}</span>`).join('')}</div>`:''}
     ${pending.length?`<div class="warnList">확인필요: ${pending.slice(0,6).map(x=>esc(x.attributeName)).join(' · ')}</div>`:''}
-    <div class="tiny">옵션명이 정확히 일치하거나 고유하게 대응되는 값만 자동입력해. 애매한 값은 비워둬.</div>
+    <div class="tiny">입력된 속성이 가장 많은 국가를 기준시장으로 자동 선택해. 동률이면 필수속성 완료도 → 최종검사 → 전체속성 수 순으로 고르고, 애매한 값은 자동입력하지 않아.</div>
   </div>`;
 }
 function renderImages(d){
