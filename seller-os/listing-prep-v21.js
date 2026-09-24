@@ -131,6 +131,121 @@ function categorySuggestionList(list,c){
 }
 function attrValuePresent(d,id){const x=d.attributeValues?.[String(id)]||{};return arr(x.valueIds).filter(Boolean).length>0||Boolean(String(x.text||'').trim())}
 function missingMandatoryCount(d){return arr(d.mandatoryAttributeIds).filter(id=>!attrValuePresent(d,id)).length}
+const ATTR_ALIASES=[
+  ['product type',['product type','item type','type of product','product category','商品類型','類型']],
+  ['skin type',['skin type','skin_types','膚質','肌膚類型']],
+  ['skin concern',['skin concern','skin concerns','skin problem','skin benefit','肌膚問題','肌膚需求']],
+  ['formulation',['formulation','formula','texture','format','型態','質地']],
+  ['material',['material','materials','材質']],
+  ['gender',['gender','target gender','sex','適用性別']],
+  ['age group',['age group','target age','age range','適用年齡']],
+  ['country of origin',['country of origin','origin','made in','manufacturing country','產地','原產地']],
+  ['scent',['scent','fragrance','香味','香氣']],
+  ['color',['color','colour','顏色']],
+  ['size',['size','product size','尺寸']],
+  ['volume',['volume','capacity','容量']],
+  ['weight',['weight','net weight','重量','淨重']],
+  ['pack size',['pack size','quantity per pack','packaging quantity','number of pieces','數量','入數']],
+  ['flavor',['flavor','flavour','taste','口味']],
+  ['benefit',['benefit','benefits','function','功能','功效']],
+  ['ingredient',['ingredient','ingredients','main ingredient','成分','主要成分']]
+];
+function canonicalAttrName(name){
+  const n=normText(name);if(!n)return '';
+  for(const [key,vals] of ATTR_ALIASES){
+    for(const v of vals){const x=normText(v);if(n===x||n.includes(x)||x.includes(n))return key}
+  }
+  return n;
+}
+function attrMetaName(d,id){
+  const row=arr(d.attributeMeta).find(x=>String(x.id)===String(id));
+  return row?.name||'';
+}
+function sourceAttributeFacts(c){
+  const facts=[];
+  const priority=['TW','SG','MY','TH','PH','VN'];
+  for(const code of priority){
+    const d=draft(c,code);
+    for(const a of arr(d.attributes)){
+      const id=String(a.attribute_id??a.attributeId??'');
+      const name=attrMetaName(d,id);if(!name)continue;
+      const values=arr(a.attribute_value_list).map(v=>({
+        text:String(v.original_value_name??v.display_value_name??v.value_name??'').trim(),
+        unit:String(v.value_unit??'').trim()
+      })).filter(v=>v.text);
+      if(!values.length)continue;
+      facts.push({key:canonicalAttrName(name),name,values,sourceMarket:code,sourceAttributeId:id});
+    }
+  }
+  return facts;
+}
+function exactOptionMatch(options,text){
+  const target=normText(text);if(!target)return null;
+  const exact=arr(options).filter(o=>normText(optionName(o))===target);
+  if(exact.length===1)return exact[0];
+  const contains=arr(options).filter(o=>{const n=normText(optionName(o));return n&&target.length>=4&&(n.includes(target)||target.includes(n))});
+  return contains.length===1?contains[0]:null;
+}
+function applyFactToAttribute(d,meta,fact){
+  const id=attrId(meta);if(!id||attrValuePresent(d,id))return {applied:false};
+  const options=attrOptions(meta);
+  if(options.length){
+    const matched=[];
+    for(const v of fact.values){const opt=exactOptionMatch(options,v.text);if(!opt)return {applied:false,reason:'option'};matched.push(String(optionId(opt)))}
+    const valueIds=uniq(matched).filter(Boolean);if(!valueIds.length)return {applied:false,reason:'option'};
+    d.attributeValues[id]={valueIds:isMultiAttr(meta)?valueIds:valueIds.slice(0,1),text:''};
+  }else{
+    if(fact.values.length!==1)return {applied:false,reason:'multi-text'};
+    d.attributeValues[id]={valueIds:[],text:fact.values[0].text,unit:fact.values[0].unit||''};
+  }
+  return {applied:true};
+}
+async function ensureAttributeMetadata(c,code,d){
+  if(!d.selectedShopId||!(Number(d.categoryId)>0))return [];
+  const key=attrCacheKey(d);
+  if(arr(state.attributeCache[key]).length)return state.attributeCache[key];
+  const [r,brandR]=await Promise.all([
+    api('/api/candidates/listing/attributes?shopId='+encodeURIComponent(d.selectedShopId)+'&categoryId='+encodeURIComponent(d.categoryId)+'&language=en'),
+    api('/api/candidates/listing/brands?shopId='+encodeURIComponent(d.selectedShopId)+'&categoryId='+encodeURIComponent(d.categoryId)+'&language=en').catch(()=>({brandList:[],isMandatory:false}))
+  ]);
+  const list=arr(r.attributeList);state.attributeCache[key]=list;state.brandCache[key]=brandR||{brandList:[],isMandatory:false};
+  d.attributeMeta=list.map(x=>({id:attrId(x),name:attrName(x),mandatory:attrMandatory(x),inputType:attrInputType(x)}));
+  d.brandMandatory=Boolean(brandR?.isMandatory);rebuildAttributes(d,list);
+  return list;
+}
+async function autoMatchCommonAttributes(c,{onlyCode=null}={}){
+  if(state.busy)return;
+  const eligible=MARKETS.filter(m=>!m.future).map(m=>m.code).filter(code=>{
+    if(onlyCode&&code!==onlyCode)return false;
+    const p=plan(c,code),d=draft(c,code);return p.regulationStatus==='OK'&&p.decision==='SELL'&&d.selectedShopId&&Number(d.categoryId)>0;
+  });
+  if(!eligible.length)return flash('공통속성을 매칭할 최종 카테고리가 준비된 국가가 없어.','warn');
+  const facts=sourceAttributeFacts(c);
+  if(!facts.length)return flash('기준이 될 입력 속성이 아직 없어. 대만처럼 한 국가의 필수속성을 먼저 완성해줘.','warn');
+  state.busy=true;let applied=0,pending=0;
+  try{
+    for(const code of eligible){
+      const d=draft(c,code),metadata=await ensureAttributeMetadata(c,code,d);
+      const matches=[];const needs=[];
+      for(const meta of metadata){
+        const id=attrId(meta);if(!id||attrValuePresent(d,id))continue;
+        const key=canonicalAttrName(attrName(meta));
+        const candidates=facts.filter(f=>f.key===key&&f.sourceMarket!==code);
+        if(!candidates.length)continue;
+        const fact=candidates[0],result=applyFactToAttribute(d,meta,fact);
+        if(result.applied){
+          applied++;matches.push({attributeId:id,attributeName:attrName(meta),sourceMarket:fact.sourceMarket,sourceAttribute:fact.name,values:fact.values.map(v=>v.text),confidence:'high'});
+        }else{pending++;needs.push({attributeId:id,attributeName:attrName(meta),sourceMarket:fact.sourceMarket,sourceAttribute:fact.name,values:fact.values.map(v=>v.text),reason:result.reason||'confirm'});}
+      }
+      d.autoAttributeMatches=matches;
+      d.autoAttributePending=needs;
+      if(metadata.length)rebuildAttributes(d,metadata);
+      touch(d);
+    }
+    await saveCandidate(c,{quiet:true});renderAll();
+    flash('6개국 공통속성 자동매칭 완료 · 자동입력 '+applied+'개 · 확인필요 '+pending+'개. 옵션명이 정확히 맞지 않는 값은 자동으로 넣지 않았어.',pending?'warn':'ok');
+  }catch(e){flash(e.message,'bad')}finally{state.busy=false}
+}
 function prepStatus(c,code){
   const p=plan(c,code),d=draft(c,code),issues=[];
   if(market(code)?.future)return {key:'BLOCKED',label:'차단',issues:['향후 시장']};
