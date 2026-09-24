@@ -326,6 +326,7 @@ app.get('/api/shopee/shipping-parameter/:orderSn', async (req, res) => {
 });
 app.post('/api/shopee/ship/:orderSn', async (req, res) => {
   if (!requireDb(res)) return;
+  if (shopeeReadOnly()) return res.status(403).json({ error:true, message:'Shopee 읽기 전용 모드에서는 출고 처리를 실행하지 않습니다.' });
   try {
     const orderSn = String(req.params.orderSn);
     const method = String(req.body?.method || '');
@@ -387,6 +388,7 @@ app.get('/api/shopee/shipping-document/parameter/:orderSn', async (req, res) => 
 });
 app.post('/api/shopee/shipping-document/create/:orderSn', async (req, res) => {
   if (!requireDb(res)) return;
+  if (shopeeReadOnly()) return res.status(403).json({ error:true, message:'Shopee 읽기 전용 모드에서는 배송문서 생성을 실행하지 않습니다.' });
   try {
     const order = await loadLogisticsOrder(req.params.orderSn);
     if (!order) return res.status(404).json({ error: true, message: '주문을 찾을 수 없습니다.' });
