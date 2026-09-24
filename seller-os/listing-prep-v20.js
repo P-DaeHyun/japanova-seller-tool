@@ -555,6 +555,14 @@ function bindEditor(c,code,d){
   $('#loadCategories')?.addEventListener('click',()=>loadCategories(d));
   $('#loadAttributes')?.addEventListener('click',()=>loadAttributes(c,code,d));
   $('#loadLogistics')?.addEventListener('click',()=>loadLogistics(d));
+  $('.categorySuggestion').forEach(btn=>btn.onclick=async()=>{
+    const id=Number(btn.dataset.categorySuggestion||0);if(!id)return;
+    const x=(state.categoryCache[String(d.selectedShopId)]||[]).find(v=>categoryId(v)===id);
+    if(x&&categoryHasChildren(x)){d.categorySuggestions=[];touch(d);await saveCandidate(c,{quiet:true});return loadCategories(d,id)}
+    d.categoryId=id;d.categoryName=x?categoryName(x):(arr(d.categorySuggestions).find(s=>Number(s.categoryId)===id)?.categoryName||'');d.categorySuggestions=[];d.attributes=[];d.mandatoryAttributeIds=[];d.attributeValues={};touch(d);
+    await saveCandidate(c,{quiet:true});await loadAttributes(c,code,d);if(!state.logisticsCache[String(d.selectedShopId||'')])await loadLogistics(d);
+  });
+  $('#missingOnly')?.addEventListener('change',e=>{state.missingOnly[code]=Boolean(e.target.checked);renderEditor()});
   $('#categoryPick')?.addEventListener('change',async e=>{
     const id=Number(e.target.value||0);if(!id)return;
     const x=(state.categoryCache[String(d.selectedShopId)]||[]).find(v=>categoryId(v)===id);
@@ -563,8 +571,8 @@ function bindEditor(c,code,d){
       await saveCandidate(c,{quiet:true});
       return loadCategories(d,id);
     }
-    d.categoryId=id;d.categoryName=x?categoryName(x):'';d.attributes=[];d.mandatoryAttributeIds=[];d.attributeValues={};touch(d);
-    await saveCandidate(c,{quiet:true});renderAll();flash(`최종 카테고리 “${d.categoryName}”를 선택했어. 이제 속성 불러오기를 눌러줘.`);
+    d.categoryId=id;d.categoryName=x?categoryName(x):'';d.categorySuggestions=[];d.attributes=[];d.mandatoryAttributeIds=[];d.attributeValues={};touch(d);
+    await saveCandidate(c,{quiet:true});await loadAttributes(c,code,d);if(!state.logisticsCache[String(d.selectedShopId||'')])await loadLogistics(d);flash(`최종 카테고리 “${d.categoryName}” 선택 완료. 속성·브랜드·물류를 자동으로 이어서 불러왔어.`);
   });
   $('#brandSelect')?.addEventListener('change',async e=>{
     const meta=state.brandCache[attrCacheKey(d)]||{};
