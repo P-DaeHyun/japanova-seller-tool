@@ -135,8 +135,8 @@ async function connectedShop(shopId) {
   const result = await query(
     `select market_code, shop_id, shop_name, status, last_sync_at
      from shopee_connections
-     where shop_id=$1 and status='CONNECTED'`,
-    [Number(shopId)]
+     where shop_id=$1 and environment=$2 and status='CONNECTED'`,
+    [Number(shopId), shopeeEnvironment()]
   );
   if (!result.rows[0]) throw new Error('연결된 Shopee Shop을 찾을 수 없습니다.');
   return result.rows[0];
@@ -144,6 +144,10 @@ async function connectedShop(shopId) {
 
 function shopeeEnvironment() {
   return String(process.env.SHOPEE_ENV || 'sandbox').trim().toLowerCase();
+}
+
+function shopeeReadOnly() {
+  return String(process.env.SHOPEE_READ_ONLY || '').trim().toLowerCase() === 'true';
 }
 
 function sandboxPublishEnabled() {
@@ -157,7 +161,7 @@ function productionPublishEnabled() {
 }
 
 function publishEnabled() {
-  return sandboxPublishEnabled() || productionPublishEnabled();
+  return !shopeeReadOnly() && (sandboxPublishEnabled() || productionPublishEnabled());
 }
 
 function buildAddItemPayload(draft) {
@@ -432,16 +436,19 @@ router.get('/listing/status', async (_req, res) => {
       `select market_code, shop_id, shop_name, status, last_sync_at, updated_at,
               access_token_expires_at, refresh_token_expires_at
        from shopee_connections
-       where status='CONNECTED'
+       where environment=$1 and status='CONNECTED'
        order by market_code nulls last, updated_at desc, shop_id desc`
-    );
+    , [shopeeEnvironment()]);
     const environment = shopeeEnvironment();
     res.json({
       environment,
+      readOnly: shopeeReadOnly(),
+      productionReadOnlyMode: environment === 'production' && shopeeReadOnly(),
+      credentialsConfigured: Boolean(String(process.env.SHOPEE_PARTNER_ID||'').trim() && String(process.env.SHOPEE_PARTNER_KEY||'').trim() && String(process.env.SHOPEE_REDIRECT_URI||'').trim()),
       publishMutationEnabled: publishEnabled(),
       sandboxPublishEnabled: sandboxPublishEnabled(),
       productionPublishEnabled: productionPublishEnabled(),
-      mediaUploadEnabled: true,
+      mediaUploadEnabled: !shopeeReadOnly(),
       publishSafety: {
         sandboxOnlyForTesting: true,
         productionStillLockedUnlessExplicitlyEnabled: true,
@@ -553,6 +560,7 @@ router.get('/listing/logistics', async (req, res) => {
 });
 
 router.post('/listing/upload-image', (req, res, next) => {
+  if (shopeeReadOnly()) return fail(res, new Error('Shopee 읽기 전용 모드에서는 Media 업로드를 실행하지 않아.'), 403);
   imageUpload.single('image')(req, res, error => {
     if (error) return fail(res, error, 400);
     next();
@@ -691,6 +699,7 @@ router.post('/listing/publish', async (req, res) => {
   const candidateId = String(req.body?.candidateId || '').trim();
   const marketCode = String(req.body?.marketCode || '').trim().toUpperCase();
   try {
+    if (shopeeReadOnly()) return fail(res, new Error('Shopee 읽기 전용 모드에서는 상품 등록을 실행하지 않아.'), 403);
     if (!candidateId) throw new Error('candidateId가 필요합니다.');
     if (!marketCode) throw new Error('marketCode가 필요합니다.');
     const environment = shopeeEnvironment();
