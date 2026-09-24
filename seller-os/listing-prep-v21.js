@@ -1,0 +1,741 @@
+(function(){
+'use strict';
+
+const API='https://japanova-seller-os-api.onrender.com';
+const MARKETS=[
+  {code:'TW',name:'대만',cur:'TWD',lang:'zh-hant'},
+  {code:'SG',name:'싱가포르',cur:'SGD',lang:'en'},
+  {code:'MY',name:'말레이시아',cur:'MYR',lang:'en'},
+  {code:'TH',name:'태국',cur:'THB',lang:'en'},
+  {code:'PH',name:'필리핀',cur:'PHP',lang:'en'},
+  {code:'VN',name:'베트남',cur:'VND',lang:'en'},
+  {code:'BR',name:'브라질',cur:'BRL',lang:'pt-br',future:true}
+];
+const $=(s)=>document.querySelector(s);
+const $$=(s)=>[...document.querySelectorAll(s)];
+const esc=(v)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=(n,d=0)=>Number.isFinite(Number(n))?Number(n).toLocaleString('ko-KR',{maximumFractionDigits:d}):'-';
+const now=()=>new Date().toISOString();
+const uniq=(a)=>[...new Set(a)];
+const arr=(v)=>Array.isArray(v)?v:[];
+let state={candidates:[],selectedId:null,market:'TW',listingStatus:{environment:'unknown',connections:[]},categoryCache:{},attributeCache:{},brandCache:{},logisticsCache:{},publishAttemptCache:{},missingOnly:{},busy:false};
+
+async function api(path,opts={}){
+  const headers={...(opts.headers||{})};
+  let body=opts.body;
+  if(body&&!(body instanceof FormData)){
+    headers['Content-Type']='application/json';
+    if(typeof body!=='string') body=JSON.stringify(body);
+  }
+  const r=await fetch(`${API}${path}`,{...opts,headers,body});
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(data.message||`HTTP ${r.status}`);
+  return data;
+}
+function flash(msg,type='ok'){
+  const b=$('#flash');if(!b)return;b.textContent=msg;b.className=`flash ${type}`;b.hidden=false;
+  clearTimeout(flash.t);flash.t=setTimeout(()=>b.hidden=true,5600);
+}
+function market(code){return MARKETS.find(x=>x.code===code)}
+function candidate(){return state.candidates.find(c=>c.id===state.selectedId)||null}
+function plan(c,code){c.plans=c.plans||{};c.plans[code]=c.plans[code]||{};return c.plans[code]}
+function cleanSku(v){return String(v||'').toUpperCase().replace(/[^A-Z0-9_-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,100)}
+function baseSku(c,code){const raw=cleanSku(c.id||c.name||'ITEM');return `JNV-${(raw||'ITEM').slice(-24)}-${code}`.slice(0,100)}
+function defaultDescription(c,code){
+  if(code==='TW') return `商品名稱：${c.name}\n\n日本採購商品。\n出貨地：日本\n購買前請確認商品圖片、規格、尺寸、容量與數量。\n若商品包裝或設計因製造商更新而變更，請以實際商品為準。`;
+  return `Product: ${c.name}\n\nSourced in Japan.\nShips from Japan.\nPlease check the product images, specifications, size, capacity and quantity before purchase.\nPackaging or design may be updated by the manufacturer.`;
+}
+function draft(c,code){
+  const p=plan(c,code);
+  if(!p.listingDraft||typeof p.listingDraft!=='object'||Array.isArray(p.listingDraft)) p.listingDraft={};
+  const d=p.listingDraft;
+  if(d.enabled===undefined)d.enabled=p.decision==='SELL';
+  if(!d.title)d.title='';
+  if(!d.description)d.description='';
+  if(!d.sku)d.sku=baseSku(c,code);
+  if(!(Number(d.priceLocal)>0)&&Number(p.plannedPrice)>0)d.priceLocal=Number(p.plannedPrice);
+  if(d.initialStock===undefined)d.initialStock=Number(c.initialUnits||0);
+  if(code==='SG' && c.id==='SANDBOX-TEST-TW' && !(Number(d.initialStock)>0))d.initialStock=5;
+  if(d.weightG===undefined)d.weightG=Number(c.weightG||0);
+  if(d.lengthCm===undefined)d.lengthCm=Number(c.lengthCm||0);
+  if(d.widthCm===undefined)d.widthCm=Number(c.widthCm||0);
+  if(d.heightCm===undefined)d.heightCm=Number(c.heightCm||0);
+  if(!d.condition)d.condition='NEW';
+  if(d.brandId===undefined)d.brandId='';
+  if(!d.brandName)d.brandName='';
+  if(!d.brandOriginalName)d.brandOriginalName=d.brandName||'';
+  if(d.brandMandatory===undefined)d.brandMandatory=false;
+  d.imageUrls=arr(d.imageUrls);
+  d.imageIds=arr(d.imageIds);
+  d.imageUploads=arr(d.imageUploads);
+  d.logistics=arr(d.logistics).map(Number).filter(Boolean);
+  d.attributes=arr(d.attributes);
+  d.mandatoryAttributeIds=arr(d.mandatoryAttributeIds).map(String);
+  if(!d.attributeValues||typeof d.attributeValues!=='object'||Array.isArray(d.attributeValues))d.attributeValues={};
+  if(!d.updatedAt)d.updatedAt=now();
+  return d;
+}
+function applyDefaults(c,code){
+  const d=draft(c,code);
+  if(!d.title)d.title=c.name||'';
+  if(!d.description)d.description=defaultDescription(c,code);
+  if(c.id==='SANDBOX-TEST-TW' && code==='SG' && String(d.description).trim().length>200)d.description='JAPANOVA Sandbox test item. API listing test only. Not for real sale.';
+  return d;
+}
+function touch(d){d.updatedAt=now();d.preflight=null;}
+function connectionsFor(code){
+  return arr(state.listingStatus.connections)
+    .filter(x=>String(x.marketCode||'').toUpperCase()===code)
+    .sort((a,b)=>new Date(b.updatedAt||b.lastSyncAt||0)-new Date(a.updatedAt||a.lastSyncAt||0));
+}
+function selectedShop(d,code){return connectionsFor(code).find(x=>Number(x.shopId)===Number(d.selectedShopId))||null}
+function localPrice(n,cur){if(!(Number(n)>0))return '-';const decimals=['SGD','MYR','BRL'].includes(cur)?2:0;return `${Number(n).toLocaleString('ko-KR',{maximumFractionDigits:decimals})} ${cur}`}
+
+function attrId(a){return String(a?.attribute_id??a?.attributeId??'')}
+function attrName(a){return String(a?.display_attribute_name??a?.attribute_name??a?.name??`속성 ${attrId(a)}`)}
+function attrMandatory(a){return Boolean(a?.mandatory??a?.is_mandatory??a?.isMandatory)}
+function attrInputType(a){return String(a?.input_type??a?.attribute_input_type??a?.input_type_name??'').toUpperCase()}
+function attrOptions(a){return arr(a?.attribute_value_list||a?.value_list||a?.values||a?.attribute_values)}
+function optionId(v){return String(v?.value_id??v?.id??'0')}
+function optionName(v){return String(v?.display_value_name??v?.value_name??v?.original_value_name??v?.name??optionId(v))}
+function isMultiAttr(a){return attrInputType(a).includes('MULTIPLE')||attrInputType(a).includes('MULTI_SELECT')}
+function attrCacheKey(d){return `${Number(d.selectedShopId)||0}:${Number(d.categoryId)||0}`}
+function logisticId(v){return Number(v?.logistic_id??v?.logistics_channel_id??v?.channel_id??v?.logistic_channel_id??0)}
+function logisticName(v){return String(v?.logistics_channel_name??v?.logistic_name??v?.channel_name??v?.name??`물류 ${logisticId(v)}`)}
+function categoryId(v){return Number(v?.category_id??v?.id??0)}
+function categoryName(v){return String(v?.display_category_name??v?.original_category_name??v?.category_name??v?.name??`카테고리 ${categoryId(v)}`)}
+function categoryHasChildren(v){return Boolean(v?.has_children??v?.hasChildren)}
+function normText(v){return String(v||'').toLowerCase().normalize('NFKC').replace(/[^a-z0-9\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]+/g,' ').trim()}
+function srcMeta(c){return c?.plans?.__sourceMeta||{}}
+function categoryTokens(c){
+  const raw=[c?.name,srcMeta(c).category,srcMeta(c).brand].filter(Boolean).join(' ');
+  const out=normText(raw).split(/\s+/).filter(x=>x.length>=2);
+  const aliases=[];
+  const rules=[
+    [/洗顔|ビオレ|スキン|美容|化粧|フェイス|face|skin|cosmetic|beauty|cleans/i,['beauty','personal care','skincare','face','cleanser']],
+    [/シャンプ|ヘア|hair|shampoo|conditioner/i,['beauty','personal care','hair']],
+    [/文具|ペン|鉛筆|ノート|stationery|pen|pencil/i,['stationery','office','school']],
+    [/玩具|おもちゃ|ベイブレード|toy|beyblade/i,['toys','hobbies','games']],
+    [/食品|飲料|青汁|お茶|food|drink|beverage|tea/i,['food','beverages','groceries']],
+    [/生理|ナプキン|sanitary|feminine/i,['health','personal care','feminine']],
+    [/家電|充電|usb|電池|battery|electronic/i,['electronics','home appliances']]
+  ];
+  for(const [re,words] of rules)if(re.test(raw))aliases.push(...words);
+  return uniq([...out,...aliases].map(normText).filter(Boolean));
+}
+function categorySuggestionList(list,c){
+  const tokens=categoryTokens(c);
+  return arr(list).map(v=>{const name=normText(categoryName(v));let score=0;for(const t of tokens){if(name===t)score+=12;else if(name.includes(t)||t.includes(name))score+=6;else if(t.split(' ').some(p=>p.length>2&&name.includes(p)))score+=2}return {v,score}})
+    .filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,5)
+    .map(x=>({categoryId:categoryId(x.v),categoryName:categoryName(x.v),hasChildren:categoryHasChildren(x.v),score:x.score}));
+}
+function attrValuePresent(d,id){const x=d.attributeValues?.[String(id)]||{};return arr(x.valueIds).filter(Boolean).length>0||Boolean(String(x.text||'').trim())}
+function missingMandatoryCount(d){return arr(d.mandatoryAttributeIds).filter(id=>!attrValuePresent(d,id)).length}
+function prepStatus(c,code){
+  const p=plan(c,code),d=draft(c,code),issues=[];
+  if(market(code)?.future)return {key:'BLOCKED',label:'차단',issues:['향후 시장']};
+  if(p.regulationStatus!=='OK'||p.decision!=='SELL')return {key:'BLOCKED',label:'차단',issues:['판매대상 아님']};
+  if(!connectionsFor(code).length)return {key:'BLOCKED',label:'차단',issues:['연결 Shop 없음']};
+  if(!d.selectedShopId)issues.push('Shop 선택');
+  if(!(Number(d.categoryId)>0))issues.push('카테고리 확인');
+  const miss=missingMandatoryCount(d);if(miss)issues.push('필수속성 '+miss+'개');
+  if(d.brandMandatory&&!d.brandId)issues.push('브랜드 확인');
+  if(!d.logistics.length)issues.push('물류 확인');
+  if(!d.imageIds.length)issues.push('Media 이미지 업로드');
+  return issues.length?{key:'CONFIRM',label:'확인필요',issues}:{key:'COMPLETE',label:'완료',issues:[]};
+}
+
+function gate(c,code){
+  const p=plan(c,code),m=market(code),blocks=[];
+  if(m?.future)blocks.push('브라질은 향후 입점 시장이라 실제 등록 준비를 잠가뒀어.');
+  if(c.status!=='READY')blocks.push('후보상품 상태가 등록 후보(READY)가 아니야.');
+  if((p.regulationStatus||'UNCHECKED')!=='OK')blocks.push('국가별 규제 상태가 판매가능(OK)이 아니야.');
+  if((p.decision||'AUTO')!=='SELL')blocks.push('검증센터에서 이 국가를 판매대상(SELL)으로 확정하지 않았어.');
+  return blocks;
+}
+function rebuildAttributes(d,metadata){
+  const out=[];
+  for(const meta of arr(metadata)){
+    const id=attrId(meta);if(!id)continue;
+    const saved=d.attributeValues[id]||{};
+    const values=[];
+    const options=attrOptions(meta);
+    const selected=arr(saved.valueIds).map(String).filter(Boolean);
+    for(const valueId of selected){
+      const opt=options.find(o=>optionId(o)===valueId);
+      values.push({value_id:Number(valueId)||0,original_value_name:opt?optionName(opt):String(saved.text||'')});
+    }
+    const text=String(saved.text||'').trim();
+    if(!selected.length&&text) values.push({value_id:0,original_value_name:text,...(saved.unit?{value_unit:String(saved.unit)}:{})});
+    if(values.length) out.push({attribute_id:Number(id)||id,attribute_value_list:values});
+  }
+  d.attributes=out;
+  d.mandatoryAttributeIds=arr(metadata).filter(attrMandatory).map(attrId).filter(Boolean);
+  return out;
+}
+function clientReadiness(c,code){
+  const d=draft(c,code),m=market(code),blocks=[...gate(c,code)],warnings=[];
+  if(!d.enabled)blocks.push('등록 준비 스위치가 꺼져 있어.');
+  if(!String(d.title||'').trim())blocks.push('상품명이 비어 있어.');
+  if(String(d.title||'').trim().length>120)blocks.push('상품명이 120자를 넘었어.');
+  const descriptionText=String(d.description||'').trim();
+  if(!descriptionText)blocks.push('상세설명이 비어 있어.');
+  if(state.listingStatus.environment==='sandbox' && descriptionText.length>200)blocks.push(`Sandbox 상세설명은 200자 이하여야 해. 현재 ${descriptionText.length}자야.`);
+  if(!String(d.sku||'').trim())blocks.push('SKU가 비어 있어.');
+  if(!(Number(d.priceLocal)>0))blocks.push(`판매가(${m.cur})가 필요해.`);
+  const stockQty=Math.floor(Number(d.initialStock)||0);
+  if(state.listingStatus.environment==='sandbox'){
+    if(stockQty<2||stockQty>100000)blocks.push('Sandbox 등록재고는 2~100000개여야 해.');
+  }else if(stockQty<1)blocks.push('등록재고가 1개 이상이어야 해.');
+  if(!(Number(d.weightG)>0))blocks.push('포장 후 중량이 필요해.');
+  if(!(Number(d.categoryId)>0))blocks.push('Shopee 카테고리를 선택해야 해.');
+  if(!d.selectedShopId)blocks.push('등록 대상 Shopee Shop을 선택해야 해.');
+  if(!d.imageIds.length)blocks.push('Shopee image_id가 하나 이상 필요해.');
+  if(d.imageIds.length>9)blocks.push('상품 이미지는 최대 9개까지만 준비해.');
+  if(!d.logistics.length)blocks.push('물류 채널을 하나 이상 선택해야 해.');
+  if(d.brandMandatory && (!String(d.brandName||'').trim() || d.brandId==='' || d.brandId===null))blocks.push('이 카테고리는 브랜드 선택이 필수야.');
+  const present=new Set(d.attributes.map(attrId).filter(Boolean));
+  const missing=d.mandatoryAttributeIds.filter(id=>!present.has(String(id)));
+  if(missing.length)blocks.push(`필수속성 ${missing.length}개가 아직 미입력이야.`);
+  if(!(Number(d.lengthCm)>0&&Number(d.widthCm)>0&&Number(d.heightCm)>0))warnings.push('포장 3변 치수가 완성되지 않았어.');
+  return {ready:blocks.length===0,blocks:uniq(blocks),warnings:uniq(warnings)};
+}
+function buildPackage(c,code){
+  const d=draft(c,code),m=market(code),r=clientReadiness(c,code);
+  const dims=(Number(d.lengthCm)>0&&Number(d.widthCm)>0&&Number(d.heightCm)>0)?{
+    package_length:Math.round(Number(d.lengthCm)),package_width:Math.round(Number(d.widthCm)),package_height:Math.round(Number(d.heightCm))
+  }:undefined;
+  const payload={
+    item_name:String(d.title||'').trim(),description:String(d.description||'').trim(),item_sku:String(d.sku||'').trim(),
+    category_id:Number(d.categoryId||0),original_price:Number(d.priceLocal||0),weight:Number(d.weightG||0)/1000,
+    ...(dims?{dimension:dims}:{}),condition:d.condition||'NEW',
+    ...((String(d.brandName||'').trim() && d.brandId!=='' && d.brandId!==null)?{brand:{brand_id:Number(d.brandId),original_brand_name:String(d.brandOriginalName||d.brandName).trim()}}:{}),
+    image:{image_id_list:d.imageIds},
+    logistic_info:d.logistics.map(id=>({logistic_id:Number(id),enabled:true})).filter(x=>x.logistic_id>0),
+    attribute_list:d.attributes,seller_stock:[{stock:Number(d.initialStock||0)}],item_status:'UNLIST'
+  };
+  return {schema:'JAPANOVA_LISTING_PACKAGE_V2',generatedAt:now(),candidateId:c.id,candidateName:c.name,marketCode:code,marketName:m.name,currency:m.cur,
+    validation:{clientReady:r.ready,clientBlockers:r.blocks,clientWarnings:r.warnings,serverPreflight:d.preflight||null},
+    draft:{...d},shopee:{targetShopId:d.selectedShopId||null,mutationLocked:!state.listingStatus.publishMutationEnabled,endpoint:'/api/v2/product/add_item',payloadPreview:payload},
+    note:state.listingStatus.environment==='sandbox'&&state.listingStatus.sandboxPublishEnabled
+      ?'v1.4 Sandbox에서는 최종검사 통과 후 UNLIST 테스트 상품을 명시적 확인으로 생성할 수 있습니다. Production은 계속 잠겨 있습니다.'
+      :'상품 생성 mutation은 서버 안전스위치가 켜진 환경에서만 사용할 수 있습니다.'};
+}
+
+async function loadPublishAttempt(c,code){
+  if(!c)return null;
+  const key=`${c.id}:${code}`;
+  try{
+    const r=await api(`/api/candidates/listing/publish-status?candidateId=${encodeURIComponent(c.id)}&marketCode=${encodeURIComponent(code)}`);
+    state.publishAttemptCache[key]=r.attempt||null;
+    return state.publishAttemptCache[key];
+  }catch{
+    state.publishAttemptCache[key]=null;
+    return null;
+  }
+}
+function currentPublishAttempt(c,code){return state.publishAttemptCache[`${c?.id||''}:${code}`]||null}
+
+async function load(){
+  const [cands,status]=await Promise.all([
+    api('/api/candidates'),api('/api/candidates/listing/status').catch(()=>({environment:'backend-pending',publishMutationEnabled:false,connections:[]}))
+  ]);
+  state.candidates=arr(cands.candidates);state.listingStatus=status||{};
+  const params=new URLSearchParams(location.search);
+  const requestedId=params.get('candidateId');
+  const requestedMarket=String(params.get('market')||'').toUpperCase();
+  const requested=state.candidates.find(c=>c.id===requestedId);
+  const ready=state.candidates.find(c=>c.status==='READY');
+  state.selectedId=(requested||ready||state.candidates[0]||{}).id||null;
+  if(MARKETS.some(m=>m.code===requestedMarket))state.market=requestedMarket;
+  renderAll();
+  const c=candidate();if(c){await loadPublishAttempt(c,state.market);renderAll()}
+}
+async function seedSandboxCandidate(){
+  if(state.busy)return;
+  if(state.listingStatus.environment!=='sandbox')return flash('Sandbox 환경에서만 테스트 후보를 만들 수 있어.','warn');
+  state.busy=true;
+  try{
+    const r=await api('/api/candidates/listing/sandbox-test-candidate',{method:'POST'});
+    flash(r.message||'Sandbox 테스트 후보를 준비했어.');
+    await load();
+    if(r.candidate?.id){state.selectedId=r.candidate.id;state.market='TW';renderAll()}
+  }catch(e){flash(e.message,'bad')}finally{state.busy=false}
+}
+
+async function prepareAllListingDrafts(c){
+  if(state.busy)return;
+  if(c.id==='SANDBOX-TEST-TW')return flash('실제 후보상품에서 다국가 초안을 만들어줘.','warn');
+  if(c.status!=='READY')return flash('READY 상태 후보상품만 다국가 등록초안을 만들 수 있어.','warn');
+  const codes=MARKETS.filter(m=>!m.future).map(m=>m.code).filter(code=>{
+    const p=plan(c,code);
+    return p.regulationStatus==='OK'&&p.decision==='SELL';
+  });
+  if(!codes.length)return flash('판매가능(OK) + 판매대상(SELL)으로 확정된 국가가 없어.','warn');
+  const prepared=[];
+  for(const code of codes){
+    const p=plan(c,code),d=applyDefaults(c,code);
+    d.enabled=true;
+    d.title=d.title||c.name||'';
+    d.description=d.description||defaultDescription(c,code);
+    d.sku=d.sku||baseSku(c,code);
+    if(Number(p.plannedPrice)>0)d.priceLocal=Number(p.plannedPrice);
+    d.initialStock=Math.max(state.listingStatus.environment==='sandbox'?2:1,Math.floor(Number(c.initialUnits)||1));
+    if(Number(c.weightG)>0)d.weightG=Number(c.weightG);
+    if(Number(c.lengthCm)>0)d.lengthCm=Number(c.lengthCm);
+    if(Number(c.widthCm)>0)d.widthCm=Number(c.widthCm);
+    if(Number(c.heightCm)>0)d.heightCm=Number(c.heightCm);
+    const jan=String(c.plans?.__sourceMeta?.jan||'').trim();
+    if(jan&&!String(d.gtin||'').trim())d.gtin=jan;
+    if(!d.selectedShopId){
+      const conns=connectionsFor(code);
+      if(conns.length===1)d.selectedShopId=Number(conns[0].shopId);
+    }
+    d.sourceSnapshot={
+      candidateId:c.id,candidateName:c.name||'',sourceUrl:c.sourceUrl||'',supplier:c.supplier||'',
+      purchaseCostJpy:Number(c.purchaseCostJpy||0),preparedAt:now()
+    };
+    touch(d);
+    prepared.push(code);
+  }
+  state.busy=true;
+  try{
+    await saveCandidate(c,{quiet:true});
+    state.market=prepared.includes(state.market)?state.market:prepared[0];
+    renderAll();
+    flash(`판매대상 ${prepared.length}개국 등록초안을 자동생성했어: ${prepared.map(code=>market(code).name).join(', ')}. 카테고리·속성·물류·이미지는 국가별로 이어서 완성하면 돼.`);
+  }catch(e){flash(e.message,'bad')}finally{state.busy=false}
+}
+
+async function prepareAllMarketMetadata(c){
+  if(state.busy)return;
+  if(!c||c.id==='SANDBOX-TEST-TW')return flash('실제 후보상품에서 실행해줘.','warn');
+  const codes=MARKETS.filter(m=>!m.future).map(m=>m.code).filter(code=>{const p=plan(c,code);return p.regulationStatus==='OK'&&p.decision==='SELL'});
+  if(!codes.length)return flash('판매가능(OK) + 판매대상(SELL) 국가가 없어.','warn');
+  state.busy=true;
+  const jan=String(srcMeta(c).jan||'').trim();
+  const sourceBrand=String(srcMeta(c).brand||'').trim();
+  const allImageUrls=uniq(MARKETS.flatMap(m=>{const d=draft(c,m.code);return [...arr(d.imageUrls),...arr(d.imageUploads).map(x=>x?.imageUrl).filter(Boolean)]}).map(x=>String(x||'').trim()).filter(Boolean)).slice(0,9);
+  let done=0,confirm=0,blocked=0;
+  try{
+    for(let i=0;i<codes.length;i++){
+      const code=codes[i],d=applyDefaults(c,code),conns=connectionsFor(code);
+      flash('6개국 자동준비 '+(i+1)+'/'+codes.length+' · '+market(code).name,'warn');
+      if(!d.selectedShopId&&conns.length===1)d.selectedShopId=Number(conns[0].shopId);
+      if(!d.selectedShopId){blocked++;continue}
+      if(jan&&!String(d.gtin||'').trim())d.gtin=jan;
+      if(allImageUrls.length&&!d.imageUrls.length)d.imageUrls=[...allImageUrls];
+      if(Number(c.weightG)>0)d.weightG=Number(c.weightG);
+      if(Number(c.lengthCm)>0)d.lengthCm=Number(c.lengthCm);
+      if(Number(c.widthCm)>0)d.widthCm=Number(c.widthCm);
+      if(Number(c.heightCm)>0)d.heightCm=Number(c.heightCm);
+      try{
+        const lr=await api('/api/candidates/listing/logistics?shopId='+encodeURIComponent(d.selectedShopId));
+        const channels=arr(lr.logisticsChannels);state.logisticsCache[String(d.selectedShopId)]=channels;
+        const usable=channels.filter(x=>{const flag=x?.enabled??x?.is_enabled??x?.isEnabled??x?.status;if(flag===undefined||flag===null||flag==='')return true;if(typeof flag==='boolean')return flag;if(typeof flag==='number')return flag>0;return !/disable|inactive|closed|off/i.test(String(flag))});
+        if(!d.logistics.length&&usable.length===1){const id=logisticId(usable[0]);if(id)d.logistics=[id]}
+      }catch{}
+      if(!(Number(d.categoryId)>0)){
+        try{
+          const qs=new URLSearchParams({shopId:String(d.selectedShopId),language:'en'});
+          const cr=await api('/api/candidates/listing/categories?'+qs.toString());
+          const cats=arr(cr.categoryList);state.categoryCache[String(d.selectedShopId)]=cats;
+          d.categorySuggestions=categorySuggestionList(cats,c);
+        }catch{}
+      }else{
+        try{
+          const [ar,br]=await Promise.all([
+            api('/api/candidates/listing/attributes?shopId='+encodeURIComponent(d.selectedShopId)+'&categoryId='+encodeURIComponent(d.categoryId)+'&language=en'),
+            api('/api/candidates/listing/brands?shopId='+encodeURIComponent(d.selectedShopId)+'&categoryId='+encodeURIComponent(d.categoryId)+'&language=en').catch(()=>({brandList:[],isMandatory:false}))
+          ]);
+          const attrs=arr(ar.attributeList),brands=arr(br.brandList);
+          state.attributeCache[attrCacheKey(d)]=attrs;state.brandCache[attrCacheKey(d)]=br||{brandList:[],isMandatory:false};
+          d.attributeMeta=attrs.map(x=>({id:attrId(x),name:attrName(x),mandatory:attrMandatory(x)}));
+          d.brandMandatory=Boolean(br?.isMandatory);
+          const wanted=normText(sourceBrand||d.brandName||MARKETS.map(m=>draft(c,m.code).brandName).find(Boolean)||'');
+          if(!d.brandId&&wanted){
+            const match=brands.find(b=>{const n=normText(b.display_brand_name||b.original_brand_name||'');return n===wanted||(wanted.length>2&&(n.includes(wanted)||wanted.includes(n)))});
+            if(match){d.brandId=Number(match.brand_id);d.brandName=String(match.display_brand_name||match.original_brand_name||'');d.brandOriginalName=String(match.original_brand_name||match.display_brand_name||'')}
+          }
+          rebuildAttributes(d,attrs);
+        }catch{}
+      }
+      touch(d);
+      const st=prepStatus(c,code);if(st.key==='COMPLETE')done++;else if(st.key==='BLOCKED')blocked++;else confirm++;
+    }
+    await saveCandidate(c,{quiet:true});renderAll();
+    flash('6개국 자동준비 완료 · 완료 '+done+' · 확인필요 '+confirm+' · 차단 '+blocked+'. 카테고리 후보와 남은 필수속성만 확인해줘.',blocked?'warn':'ok');
+  }catch(e){flash(e.message,'bad')}finally{state.busy=false}
+}
+async function prepareListingDraftFromCandidate(c,code){
+  if(state.busy)return;
+  const p=plan(c,code),d=draft(c,code),m=market(code);
+  if(c.id==='SANDBOX-TEST-TW')return flash('Sandbox 테스트 후보 말고 실제 후보상품을 선택해줘.','warn');
+  if(c.status!=='READY')return flash('READY 상태 후보상품만 등록초안을 만들 수 있어.','warn');
+
+  const changes=[];
+  const setIf=(key,value,valid=v=>v!==undefined&&v!==null&&String(v).trim()!=='')=>{
+    if(valid(value) && !valid(d[key])){d[key]=value;changes.push(key)}
+  };
+
+  d.enabled=true;
+  setIf('title',String(c.name||'').trim());
+  setIf('description',defaultDescription(c,code));
+  setIf('sku',baseSku(c,code));
+  if(!(Number(d.priceLocal)>0) && Number(p.plannedPrice)>0){d.priceLocal=Number(p.plannedPrice);changes.push('priceLocal')}
+  if(!(Number(d.initialStock)>0) && Number(c.initialUnits)>0){d.initialStock=Number(c.initialUnits);changes.push('initialStock')}
+  if(state.listingStatus.environment==='sandbox' && Number(d.initialStock)<2){d.initialStock=2;changes.push('initialStock')}
+  if(!(Number(d.weightG)>0) && Number(c.weightG)>0){d.weightG=Number(c.weightG);changes.push('weightG')}
+  if(!(Number(d.lengthCm)>0) && Number(c.lengthCm)>0){d.lengthCm=Number(c.lengthCm);changes.push('lengthCm')}
+  if(!(Number(d.widthCm)>0) && Number(c.widthCm)>0){d.widthCm=Number(c.widthCm);changes.push('widthCm')}
+  if(!(Number(d.heightCm)>0) && Number(c.heightCm)>0){d.heightCm=Number(c.heightCm);changes.push('heightCm')}
+  if(!d.selectedShopId){
+    const conns=connectionsFor(code);
+    if(conns.length===1){d.selectedShopId=Number(conns[0].shopId);changes.push('selectedShopId')}
+  }
+
+  d.sourceSnapshot={
+    candidateId:c.id,
+    candidateName:c.name||'',
+    sourceUrl:c.sourceUrl||'',
+    supplier:c.supplier||'',
+    purchaseCostJpy:Number(c.purchaseCostJpy||0),
+    preparedAt:now()
+  };
+  touch(d);
+  state.busy=true;
+  try{
+    await saveCandidate(c,{quiet:true});
+    flash(changes.length
+      ? `${m.name} 등록초안을 후보상품 정보로 자동생성했어. 카테고리·속성·브랜드·이미지는 Shopee 기준으로 이어서 완성하면 돼.`
+      : `${m.name} 등록초안 기본값은 이미 준비돼 있어. Shopee 카테고리·속성·이미지를 이어서 확인해줘.`);
+    renderAll();
+  }catch(e){flash(e.message,'bad')}finally{state.busy=false}
+}
+
+async function saveCandidate(c,{quiet=false}={}){
+  const r=await api(`/api/candidates/${encodeURIComponent(c.id)}`,{method:'PUT',body:c});
+  const saved=r.candidate||c;const i=state.candidates.findIndex(x=>x.id===saved.id);if(i>=0)state.candidates[i]=saved;
+  if(!quiet)flash('등록 준비 초안을 DB에 저장했어.');return saved;
+}
+function saveBlob(name,obj){
+  const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+
+function renderMetrics(){
+  let readyCandidates=0,enabled=0,attrsDone=0,preflight=0;
+  for(const c of state.candidates){if(c.status==='READY')readyCandidates++;for(const m of MARKETS){const d=draft(c,m.code),r=clientReadiness(c,m.code);if(d.enabled)enabled++;if(d.mandatoryAttributeIds.length&&!r.blocks.some(x=>x.includes('필수속성')))attrsDone++;if(d.preflight?.ready)preflight++;}}
+  $('#mReadyCandidates').textContent=fmt(readyCandidates);$('#mEnabledMarkets').textContent=fmt(enabled);$('#mAttributesReady').textContent=fmt(attrsDone);$('#mPreflight').textContent=fmt(preflight);
+}
+function renderCandidateSelect(){
+  const el=$('#candidateSelect');if(!state.candidates.length){el.innerHTML='<option>후보상품 없음</option>';el.disabled=true;return}
+  el.disabled=false;el.innerHTML=state.candidates.map(c=>`<option value="${esc(c.id)}" ${c.id===state.selectedId?'selected':''}>${c.status==='READY'?'✅':'⛔'} ${esc(c.name)} · ${esc(c.status)}</option>`).join('');
+}
+function renderHeader(){
+  const env=state.listingStatus.environment||'unknown',conns=arr(state.listingStatus.connections).length;
+  const sandboxOn=env==='sandbox'&&state.listingStatus.sandboxPublishEnabled;
+  const publishLabel=sandboxOn?'Sandbox add_item ON':state.listingStatus.productionPublishEnabled?'Production add_item ON':'add_item 잠금';
+  $('#apiStatus').textContent=`${env} · 연결 Shop ${conns} · ${publishLabel}`;
+  $('#apiStatus').className=`badge ${conns?(sandboxOn?'warn':'ok'):'warn'}`;
+  if($('#seedSandbox')) $('#seedSandbox').disabled=env!=='sandbox';
+}
+function renderMarketTabs(){
+  const c=candidate();$('#marketTabs').innerHTML=MARKETS.map(m=>{const d=c?draft(c,m.code):null;const r=c?clientReadiness(c,m.code):null;const ps=c?prepStatus(c,m.code):null;let label='대기';if(d?.preflight?.ready)label='최종검사 통과';else if(ps?.key==='COMPLETE')label='자동준비 완료';else if(ps?.key==='CONFIRM')label='확인필요';else if(ps?.key==='BLOCKED')label='차단';else if(r?.ready)label='검사 가능';else if(d?.enabled)label='작성중';return `<button class="marketTab ${state.market===m.code?'on':''}" data-market="${m.code}">${m.name}<small>${label}${m.future?' · 향후':''}</small></button>`}).join('');
+  $$('#marketTabs [data-market]').forEach(b=>b.onclick=async()=>{state.market=b.dataset.market;renderMarketTabs();renderEditor();renderSummary();const c=candidate();if(c){await loadPublishAttempt(c,state.market);renderAll()}});
+}
+function renderAttributeFields(d){
+  const metadata=state.attributeCache[attrCacheKey(d)]||[];
+  const brandMeta=state.brandCache[attrCacheKey(d)]||null;
+  const brands=arr(brandMeta?.brandList);
+  const brandField=brandMeta
+    ? `<div class="attrCard ${brandMeta.isMandatory?'required':''}"><div class="attrHead"><b>Brand</b><span>${brandMeta.isMandatory?'필수':'선택'} · Shopee 브랜드</span></div><select id="brandSelect" class="select"><option value="">브랜드 선택</option>${brands.map(b=>`<option value="${esc(b.brand_id)}" ${Number(d.brandId)===Number(b.brand_id)?'selected':''}>${esc(b.display_brand_name||b.original_brand_name||('Brand '+b.brand_id))}</option>`).join('')}</select><div class="tiny">Shopee get_brand_list 기준</div></div>`
+    : '';
+  if(!metadata.length)return brandField||'<div class="empty smallEmpty">카테고리 선택 후 “속성 불러오기”를 눌러줘.</div>';
+  const sorted=[...metadata].sort((a,b)=>Number(attrMandatory(b))-Number(attrMandatory(a))||attrName(a).localeCompare(attrName(b)));
+  const visible=state.missingOnly[state.market]?sorted.filter(meta=>attrMandatory(meta)&&!attrValuePresent(d,attrId(meta))):sorted;
+  return `<div class="attrGrid">${brandField}${visible.length?visible.map(meta=>{
+    const id=attrId(meta),saved=d.attributeValues[id]||{},options=attrOptions(meta),required=attrMandatory(meta),multi=isMultiAttr(meta);
+    const selected=new Set(arr(saved.valueIds).map(String));
+    let field='';
+    if(options.length){
+      field=`<select class="select attrSelect" data-attr-id="${esc(id)}" ${multi?'multiple size="5"':''}><option value="">${multi?'복수 선택 가능':'선택 안 함'}</option>${options.map(o=>`<option value="${esc(optionId(o))}" ${selected.has(optionId(o))?'selected':''}>${esc(optionName(o))}</option>`).join('')}</select>`;
+    }else field=`<input class="input attrText" data-attr-id="${esc(id)}" value="${esc(saved.text||'')}" placeholder="속성값 입력">`;
+    return `<div class="attrCard ${required?'required':''}"><div class="attrHead"><b>${esc(attrName(meta))}</b><span>${required?'필수':'선택'} · ID ${esc(id)}</span></div>${field}<div class="tiny">${esc(attrInputType(meta)||'자유입력/선택')}</div></div>`;
+  }).join(''):'<div class="empty smallEmpty">미입력 필수속성이 없어.</div>'}</div>`;
+}
+function renderImages(d){
+  const uploads=d.imageUploads.length?d.imageUploads.map((x,i)=>`<div class="imageChip"><div><b>${esc(x.fileName||`이미지 ${i+1}`)}</b><small>${esc(x.imageId||'')}</small></div><button class="mini red" data-remove-image="${i}">삭제</button></div>`).join(''):'<div class="muted">아직 Shopee Media에 업로드된 이미지가 없어.</div>';
+  return `<div class="uploadBox"><input id="imageFiles" class="input fileInput" type="file" accept="image/jpeg,image/png" multiple><button class="btn" id="uploadImages" ${d.selectedShopId?'':'disabled'}>선택 이미지 Shopee에 업로드</button><div class="tiny">JPG/JPEG/PNG · 파일당 최대 10MB · 전체 상품이미지 최대 9개. 업로드는 버튼을 눌렀을 때만 실행돼.</div></div><div class="imageList">${uploads}</div>`;
+}
+function renderLogistics(d){
+  const channels=state.logisticsCache[String(d.selectedShopId||'')]||[];
+  if(!channels.length)return '<div class="empty smallEmpty">Shop 선택 후 “물류 불러오기”를 눌러줘.</div>';
+  return `<div class="checks">${channels.map(x=>{const id=logisticId(x);if(!id)return '';return `<label><input type="checkbox" class="logisticCheck" value="${id}" ${d.logistics.includes(id)?'checked':''}><span>${esc(logisticName(x))} <small>#${id}</small></span></label>`}).join('')}</div>`;
+}
+function renderPreflight(d){
+  const p=d.preflight;if(!p)return '<div class="preflight idle"><b>서버 최종검사 미실행</b><p>초안을 저장한 뒤 Shopee 현재 카테고리 필수속성과 물류채널을 서버에서 다시 확인해.</p></div>';
+  const sandboxReady=state.listingStatus.environment==='sandbox'&&state.listingStatus.sandboxPublishEnabled;
+  const cls=p.ready?'ok':'bad';return `<div class="preflight ${cls}"><b>${p.ready?'✅ 최종검사 통과':'⛔ 최종검사 차단'}</b><p>${esc(p.checkedAt||'')}</p>${arr(p.blockers).length?`<ul>${p.blockers.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}${arr(p.warnings).length?`<div class="warnList">${p.warnings.map(x=>`⚠ ${esc(x)}`).join('<br>')}</div>`:''}<div class="tiny">${sandboxReady?'Sandbox에서는 아래 테스트 등록 버튼이 열려 있어. Production 등록은 잠금 상태야.':'상품 생성 add_item은 현재 잠금 상태야.'}</div></div>`;
+}
+
+function renderSandboxPublish(c,code,d){
+  const isSandbox=state.listingStatus.environment==='sandbox';
+  const enabled=isSandbox&&state.listingStatus.sandboxPublishEnabled;
+  const ready=Boolean(d.preflight?.ready);
+  const receipt=d.publishReceipt;
+  const attempt=currentPublishAttempt(c,code);
+  if(receipt?.itemId || attempt?.status==='SUCCEEDED'){
+    const itemId=receipt?.itemId||attempt?.itemId;
+    const verification=receipt?.verification||null;
+    const verifyBox=verification?.verified
+      ? `<div class="preflight ok rowGap"><b>✅ Shopee API 재확인 완료</b><p>${esc(verification.itemName||'')} · ${esc(verification.itemStatus||receipt?.itemStatus||'')}</p><div class="tiny">item_id ${esc(verification.itemId||itemId)} · category ${esc(verification.categoryId||'-')} · ${esc(verification.verifiedAt||'')}</div></div>`
+      : `<div class="preflight idle rowGap"><b>생성상품 API 재확인 대기</b><p>add_item 성공 후 get_item_base_info로 같은 item_id가 실제 조회되는지 한 번 더 확인해.</p><div class="actions rowGap"><button class="btn ghost" id="verifyPublishedItem">생성상품 API 재확인</button></div></div>`;
+    return `<section class="cardInner"><div class="section-head"><div><h3>7. Sandbox 테스트 등록</h3><p>이 초안은 이미 등록 완료됐어.</p></div></div><div class="preflight ok"><b>✅ Sandbox item_id ${esc(itemId)}</b><p>상태: ${esc(receipt?.itemStatus||'UNLIST')} · Shop ${esc(receipt?.shopId||attempt?.shopId||'')}</p></div>${verifyBox}</section>`;
+  }
+  const phrase=`SANDBOX PUBLISH ${code}`;
+  const attemptBox=attempt
+    ? `<div class="preflight ${attempt.status==='REVIEW'?'bad':'idle'}"><b>${attempt.status==='REVIEW'?'⛔ 이전 등록 시도 실패':attempt.status==='PENDING'?'⏳ 등록 처리 중':'등록 시도 기록'}</b><p>${esc(attempt.errorMessage||attempt.status||'')}</p></div>`
+    : '<div class="preflight idle"><b>아직 등록 시도 결과 없음</b></div>';
+  return `<section class="cardInner"><div class="section-head"><div><h3>7. Sandbox 테스트 등록</h3><p>Shopee Sandbox에 미게시(UNLIST) 테스트 상품 1개를 실제 생성해 API 흐름을 검증해.</p></div></div>
+    <div class="gate ${enabled?'':'bad'}">${enabled?'<b>Sandbox add_item 안전스위치 ON</b> · Production에는 절대 등록되지 않아.':'<b>Sandbox add_item 잠금</b> · 서버 안전스위치가 꺼져 있어.'}</div>
+    ${attemptBox}
+    <div id="sandboxPublishStatus" class="tiny rowGap"></div>
+    <label>최종 확인문구<input id="sandboxConfirm" class="input" placeholder="${esc(phrase)}" autocomplete="off"></label>
+    <div class="tiny rowGap">정확히 <b>${esc(phrase)}</b> 를 입력해야 버튼이 활성화돼. 서버 최종검사를 통과한 초안만 등록 가능하고, 중복 등록 방지 원장도 적용돼.</div>
+    <div class="actions rowGap"><button class="btn" id="sandboxPublish" disabled>${esc(market(code).name)} Sandbox에 UNLIST 테스트 상품 등록</button></div>
+    <div class="tiny">현재 환경: ${esc(state.listingStatus.environment||'unknown')} · 최종검사: ${ready?'통과':'미통과'}</div>
+  </section>`;
+}
+function renderEditor(){
+  const c=candidate(),root=$('#editor');if(!c){root.innerHTML='<div class="empty">아직 후보상품이 없어.</div>';return}
+  const code=state.market,m=market(code),p=plan(c,code),d=applyDefaults(c,code),g=gate(c,code),conns=connectionsFor(code),cats=state.categoryCache[String(d.selectedShopId||'')]||[];
+  if(!d.selectedShopId&&conns.length)d.selectedShopId=conns[0].shopId;
+  const r=clientReadiness(c,code),ps=prepStatus(c,code),suggestions=arr(d.categorySuggestions);
+  root.innerHTML=`
+    <div class="gate ${ps.key==='BLOCKED'?'bad':''}"><b>6개국 자동준비: ${ps.label}</b>${ps.issues.length?` · ${esc(ps.issues.join(' / '))}`:''}</div>
+    <div class="gate ${g.length?'bad':''}">${g.length?`<b>등록 준비 잠금</b><ul>${g.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:`<b>검증 게이트 통과</b> · 이제 등록정보를 완성하고 최종검사를 실행할 수 있어.`}</div>
+    <div class="switchRow"><div><b>${m.name} 등록 준비 대상</b><div class="tiny">실제 등록이 아니라 초안 준비 스위치야.</div></div><label><input id="enabled" type="checkbox" ${d.enabled?'checked':''}> 준비 ON</label></div>
+    <div class="grid2">
+      <section class="cardInner"><div class="section-head"><div><h3>1. 기본 등록정보</h3><p>상품관리 후보의 이름·가격·재고·중량·치수를 등록초안으로 가져와.</p></div><div class="actions"><button class="btn ghost" id="autoPrepareDraft" ${c.id==='SANDBOX-TEST-TW'?'disabled':''}>후보상품 → 등록초안 자동생성</button></div></div><div class="form">
+        <label class="full">상품명 <span class="counter">${String(d.title||'').length}/120</span><input id="title" class="input" value="${esc(d.title)}"></label>
+        <label>SKU<input id="sku" class="input" value="${esc(d.sku)}"></label><label>판매가 ${m.cur}<input id="price" class="input" type="number" step="any" min="0" value="${esc(d.priceLocal||'')}"></label>
+        <label>등록재고<input id="stock" class="input" type="number" min="${state.listingStatus.environment==='sandbox'?2:1}" max="${state.listingStatus.environment==='sandbox'?100000:''}" value="${esc(d.initialStock||0)}"><span class="tiny">${state.listingStatus.environment==='sandbox'?'Sandbox 허용범위 2~100000개':'1개 이상'}</span></label><label>포장중량 g<input id="weight" class="input" type="number" min="1" value="${esc(d.weightG||'')}"></label>
+        <label>가로 cm<input id="length" class="input" type="number" step="any" min="0" value="${esc(d.lengthCm||'')}"></label><label>세로 cm<input id="width" class="input" type="number" step="any" min="0" value="${esc(d.widthCm||'')}"></label>
+        <label>높이 cm<input id="height" class="input" type="number" step="any" min="0" value="${esc(d.heightCm||'')}"></label><label>브랜드 상태<input class="input" value="${esc(d.brandName|| (d.brandMandatory?'선택 필요':'미선택'))}" disabled></label>
+        <label class="full">GTIN / JAN / EAN<input id="gtin" class="input" value="${esc(d.gtin||'')}"></label>
+        <label class="full">상세설명<textarea id="description" maxlength="${state.listingStatus.environment==='sandbox'?200:5000}">${esc(d.description)}</textarea><span class="tiny">Sandbox: 1~200자 · 현재 ${String(d.description||'').trim().length}자</span></label>
+      </div></section>
+      <section class="cardInner"><h3>2. Shop · 카테고리</h3><div class="form">
+        <label class="full">등록 대상 Shop<select id="shop" class="select"><option value="">선택</option>${conns.map(x=>`<option value="${x.shopId}" ${Number(d.selectedShopId)===Number(x.shopId)?'selected':''}>${esc(x.shopName||'Shop')} · ${x.shopId}</option>`).join('')}</select></label>
+        <label>카테고리 ID<input id="categoryId" class="input" type="number" min="1" value="${esc(d.categoryId||'')}"></label><label>카테고리명<input id="categoryName" class="input" value="${esc(d.categoryName||'')}"></label>
+        <div class="full actions"><button class="btn ghost" id="loadCategories" ${d.selectedShopId?'':'disabled'}>카테고리 목록 불러오기</button><button class="btn ghost" id="loadAttributes" ${(d.selectedShopId&&d.categoryId)?'':'disabled'}>속성 불러오기</button><button class="btn ghost" id="loadLogistics" ${d.selectedShopId?'':'disabled'}>물류 불러오기</button></div>
+        ${suggestions.length?`<div class="full metaBox"><b>JAPANOVA 카테고리 후보</b><div class="chips">${suggestions.map(x=>`<button class="mini categorySuggestion" data-category-suggestion="${x.categoryId}">${x.hasChildren?'▶':'✓'} ${esc(x.categoryName)}</button>`).join('')}</div><div class="tiny">상품명/소싱 카테고리 기반 후보야. 국가별 카테고리 ID가 다르므로 최종 카테고리까지 확인해.</div></div>`:''}
+        ${cats.length?`<label class="full">불러온 카테고리<select id="categoryPick" class="select"><option value="">선택</option>${cats.map(x=>`<option value="${categoryId(x)}">${categoryHasChildren(x)?'▶ 하위 있음':'✓ 최종'} · ${esc(categoryName(x))} · ${categoryId(x)}</option>`).join('')}</select><span class="tiny">▶ 항목은 최종 카테고리가 아니야. 선택하면 하위 카테고리를 다시 불러와. ✓ 최종 항목을 고르면 속성·브랜드를 이어서 확인해.</span></label>`:''}
+      </div><div class="metaBox">현재 환경: <b>${esc(state.listingStatus.environment||'unknown')}</b><br>이 화면은 카테고리/속성/물류 조회와 이미지 Media 업로드만 하고 상품 생성은 하지 않아.</div></section>
+    </div>
+    <div class="section grid2">
+      <section class="cardInner"><div class="section-head"><div><h3>3. 카테고리 속성</h3><p>필수속성을 우선 정리하고, 이미 입력된 값은 숨겨서 남은 것만 볼 수 있어.</p></div><label class="tiny"><input id="missingOnly" type="checkbox" ${state.missingOnly[code]?'checked':''}> 미입력 필수만 보기</label></div>${renderAttributeFields(d)}</section>
+      <section class="cardInner"><div class="section-head"><div><h3>4. 물류 채널</h3><p>현재 연결 Shop에서 사용할 채널만 선택해.</p></div></div>${renderLogistics(d)}</section>
+    </div>
+    <div class="section grid2">
+      <section class="cardInner"><div class="section-head"><div><h3>5. 상품 이미지</h3><p>로컬 파일을 Shopee Media에 먼저 업로드해 image_id를 확보해.</p></div></div>${renderImages(d)}<label class="rowGap">이미지 원본 URL 메모<textarea id="imageUrls" placeholder="한 줄에 하나씩">${esc(d.imageUrls.join('\n'))}</textarea></label><div class="chips">${d.imageIds.map(id=>`<span>${esc(id)}</span>`).join('')}</div></section>
+      <section class="cardInner"><div class="section-head"><div><h3>6. 등록 직전 최종검사</h3><p>클라이언트 체크 후 서버가 Shopee 현재 메타데이터를 다시 대조해.</p></div></div><div class="readiness ${r.ready?'ok':'bad'}"><b>${r.ready?'클라이언트 검사 통과':'아직 검사 전 단계'}</b>${r.blocks.length?`<ul>${r.blocks.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}</div>${renderPreflight(d)}<div class="actions rowGap"><button class="btn" id="runPreflight" ${r.ready?'':'disabled'}>서버 최종검사 실행</button><button class="btn ghost" id="saveDraft">초안 저장</button><button class="btn ghost" id="exportOne">이 국가 패키지 JSON</button></div></section>
+    </div>
+    <div class="section">${renderSandboxPublish(c,code,d)}</div>`;
+  bindEditor(c,code,d);
+}
+
+function bindEditor(c,code,d){
+  const bind=(id,key,parser=v=>v)=>{const el=$(`#${id}`);if(!el)return;el.onchange=async()=>{d[key]=parser(el.value);touch(d);await saveCandidate(c,{quiet:true});renderAll()}};
+  $('#enabled').onchange=async e=>{d.enabled=e.target.checked;touch(d);await saveCandidate(c,{quiet:true});renderAll()};
+  $('#autoPrepareDraft')?.addEventListener('click',()=>prepareListingDraftFromCandidate(c,code));
+  bind('title','title');bind('sku','sku',cleanSku);bind('price','priceLocal',Number);bind('stock','initialStock',v=>state.listingStatus.environment==='sandbox'?Math.max(2,Math.min(100000,Math.floor(Number(v)||0))):Math.max(1,Math.floor(Number(v)||0)));bind('weight','weightG',Number);bind('length','lengthCm',Number);bind('width','widthCm',Number);bind('height','heightCm',Number);bind('gtin','gtin');bind('description','description');
+  $('#shop').onchange=async e=>{d.selectedShopId=e.target.value?Number(e.target.value):null;d.categoryId='';d.categoryName='';d.logistics=[];d.attributes=[];d.mandatoryAttributeIds=[];d.attributeValues={};touch(d);await saveCandidate(c,{quiet:true});renderAll()};
+  bind('categoryId','categoryId',v=>Number(v)||'');bind('categoryName','categoryName');
+  $('#imageUrls').onchange=async e=>{d.imageUrls=String(e.target.value||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0,9);touch(d);await saveCandidate(c,{quiet:true});renderAll()};
+  $('#loadCategories')?.addEventListener('click',()=>loadCategories(d));
+  $('#loadAttributes')?.addEventListener('click',()=>loadAttributes(c,code,d));
+  $('#loadLogistics')?.addEventListener('click',()=>loadLogistics(d));
+  $$('.categorySuggestion').forEach(btn=>btn.onclick=async()=>{
+    const id=Number(btn.dataset.categorySuggestion||0);if(!id)return;
+    const x=(state.categoryCache[String(d.selectedShopId)]||[]).find(v=>categoryId(v)===id);
+    if(x&&categoryHasChildren(x)){d.categorySuggestions=[];touch(d);await saveCandidate(c,{quiet:true});return loadCategories(d,id)}
+    d.categoryId=id;d.categoryName=x?categoryName(x):(arr(d.categorySuggestions).find(s=>Number(s.categoryId)===id)?.categoryName||'');d.categorySuggestions=[];d.attributes=[];d.mandatoryAttributeIds=[];d.attributeValues={};touch(d);
+    await saveCandidate(c,{quiet:true});await loadAttributes(c,code,d);if(!state.logisticsCache[String(d.selectedShopId||'')])await loadLogistics(d);
+  });
+  $('#missingOnly')?.addEventListener('change',e=>{state.missingOnly[code]=Boolean(e.target.checked);renderEditor()});
+  $('#categoryPick')?.addEventListener('change',async e=>{
+    const id=Number(e.target.value||0);if(!id)return;
+    const x=(state.categoryCache[String(d.selectedShopId)]||[]).find(v=>categoryId(v)===id);
+    if(x&&categoryHasChildren(x)){
+      d.categoryId='';d.categoryName='';d.attributes=[];d.mandatoryAttributeIds=[];d.attributeValues={};touch(d);
+      await saveCandidate(c,{quiet:true});
+      return loadCategories(d,id);
+    }
+    d.categoryId=id;d.categoryName=x?categoryName(x):'';d.categorySuggestions=[];d.attributes=[];d.mandatoryAttributeIds=[];d.attributeValues={};touch(d);
+    await saveCandidate(c,{quiet:true});await loadAttributes(c,code,d);if(!state.logisticsCache[String(d.selectedShopId||'')])await loadLogistics(d);flash(`최종 카테고리 “${d.categoryName}” 선택 완료. 속성·브랜드·물류를 자동으로 이어서 불러왔어.`);
+  });
+  $('#brandSelect')?.addEventListener('change',async e=>{
+    const meta=state.brandCache[attrCacheKey(d)]||{};
+    const b=arr(meta.brandList).find(x=>Number(x.brand_id)===Number(e.target.value));
+    d.brandId=b?Number(b.brand_id):'';
+    d.brandName=b?String(b.display_brand_name||b.original_brand_name||''):'';
+    d.brandOriginalName=b?String(b.original_brand_name||b.display_brand_name||''):'';
+    d.brandMandatory=Boolean(meta.isMandatory);
+    touch(d);await saveCandidate(c,{quiet:true});renderAll();
+  });
+  $$('.attrSelect').forEach(el=>el.onchange=async()=>{const id=String(el.dataset.attrId);const meta=(state.attributeCache[attrCacheKey(d)]||[]).find(x=>attrId(x)===id);const vals=[...el.selectedOptions].map(o=>o.value).filter(Boolean);d.attributeValues[id]={valueIds:isMultiAttr(meta)?vals:vals.slice(0,1),text:''};rebuildAttributes(d,state.attributeCache[attrCacheKey(d)]||[]);touch(d);await saveCandidate(c,{quiet:true});renderAll()});
+  $$('.attrText').forEach(el=>el.onchange=async()=>{const id=String(el.dataset.attrId);d.attributeValues[id]={valueIds:[],text:el.value.trim()};rebuildAttributes(d,state.attributeCache[attrCacheKey(d)]||[]);touch(d);await saveCandidate(c,{quiet:true});renderAll()});
+  $$('.logisticCheck').forEach(el=>el.onchange=async()=>{d.logistics=$$('.logisticCheck:checked').map(x=>Number(x.value)).filter(Boolean);touch(d);await saveCandidate(c,{quiet:true});renderAll()});
+  $('#uploadImages')?.addEventListener('click',()=>uploadImages(c,d));
+  $$('[data-remove-image]').forEach(btn=>btn.onclick=async()=>{const i=Number(btn.dataset.removeImage);d.imageUploads.splice(i,1);d.imageIds=d.imageUploads.map(x=>x.imageId).filter(Boolean);touch(d);await saveCandidate(c,{quiet:true});renderAll()});
+  $('#runPreflight')?.addEventListener('click',()=>runPreflight(c,code,d));
+  $('#saveDraft')?.addEventListener('click',()=>saveCandidate(c));
+  $('#exportOne')?.addEventListener('click',()=>saveBlob(`japanova-${c.id}-${code}-listing.json`,buildPackage(c,code)));
+  $('#verifyPublishedItem')?.addEventListener('click',()=>verifyPublishedItem(c,code,d));
+  const confirmInput=$('#sandboxConfirm'),publishBtn=$('#sandboxPublish');
+  if(confirmInput&&publishBtn){
+    const phrase=`SANDBOX PUBLISH ${code}`;
+    const sync=()=>{publishBtn.disabled=!(state.listingStatus.environment==='sandbox'&&state.listingStatus.sandboxPublishEnabled&&d.preflight?.ready&&confirmInput.value.trim()===phrase)};
+    confirmInput.addEventListener('input',sync);sync();
+    publishBtn.addEventListener('click',()=>publishSandbox(c,code,d,confirmInput.value.trim()));
+  }
+}
+async function loadCategories(d,parentCategoryId=0){
+  if(!d.selectedShopId)return flash('Shop을 먼저 선택해줘.','warn');
+  try{
+    const qs=new URLSearchParams({shopId:String(d.selectedShopId),language:'en'});
+    if(Number(parentCategoryId)>0)qs.set('parentCategoryId',String(parentCategoryId));
+    const r=await api(`/api/candidates/listing/categories?${qs.toString()}`);
+    const list=arr(r.categoryList);
+    state.categoryCache[String(d.selectedShopId)]=list;
+    renderEditor();
+    flash(Number(parentCategoryId)>0
+      ?`하위 카테고리 ${list.length}개를 불러왔어. ✓ 최종 항목을 선택해줘.`
+      :`최상위 카테고리 ${list.length}개를 불러왔어. ▶ 항목을 선택해 계속 내려가면 돼.`);
+  }catch(e){flash(e.message,'bad')}
+}
+async function loadAttributes(c,code,d){
+  if(!d.selectedShopId||!(Number(d.categoryId)>0))return flash('Shop과 ✓ 최종 카테고리를 먼저 선택해줘.','warn');
+  try{
+    const [r,brandR]=await Promise.all([
+      api(`/api/candidates/listing/attributes?shopId=${encodeURIComponent(d.selectedShopId)}&categoryId=${encodeURIComponent(d.categoryId)}&language=en`),
+      api(`/api/candidates/listing/brands?shopId=${encodeURIComponent(d.selectedShopId)}&categoryId=${encodeURIComponent(d.categoryId)}&language=en`).catch(()=>({brandList:[],isMandatory:false}))
+    ]);
+    const list=arr(r.attributeList);
+    state.attributeCache[attrCacheKey(d)]=list;
+    state.brandCache[attrCacheKey(d)]=brandR||{brandList:[],isMandatory:false};
+    d.attributeMeta=list.map(x=>({id:attrId(x),name:attrName(x),mandatory:attrMandatory(x)}));
+    d.brandMandatory=Boolean(brandR?.isMandatory);
+    const brands=arr(brandR?.brandList);
+    const wantedBrand=normText(String(srcMeta(c).brand||d.brandName||MARKETS.map(m=>draft(c,m.code).brandName).find(Boolean)||''));
+    if(!d.brandId&&wantedBrand){
+      const match=brands.find(b=>{const n=normText(b.display_brand_name||b.original_brand_name||'');return n===wantedBrand||(wantedBrand.length>2&&(n.includes(wantedBrand)||wantedBrand.includes(n)))});
+      if(match){d.brandId=Number(match.brand_id);d.brandName=String(match.display_brand_name||match.original_brand_name||'');d.brandOriginalName=String(match.original_brand_name||match.display_brand_name||'')}
+    }
+    if(d.brandMandatory && !d.brandId){
+      const noBrand=brands.find(b=>/^(no brand|無品牌|無牌|none)$/i.test(String(b.display_brand_name||b.original_brand_name||'').trim()));
+      const auto=noBrand||(brands.length===1?brands[0]:null);
+      if(auto){
+        d.brandId=Number(auto.brand_id);
+        d.brandName=String(auto.display_brand_name||auto.original_brand_name||'');
+        d.brandOriginalName=String(auto.original_brand_name||auto.display_brand_name||'');
+      }
+    }
+    rebuildAttributes(d,list);touch(d);await saveCandidate(c,{quiet:true});renderAll();
+    if(!list.length&&!brands.length)return flash('속성과 브랜드 목록이 모두 비어 있어. 최종 카테고리인지 다시 확인해줘.','warn');
+    flash(`속성 ${list.length}개 · 필수 ${arr(r.mandatoryAttributes).length}개 · 브랜드 ${brands.length}개${d.brandMandatory?'(필수)':''}를 불러왔어.`);
+  }catch(e){flash(e.message,'bad')}
+}
+async function loadLogistics(d){
+  if(!d.selectedShopId)return flash('Shop을 먼저 선택해줘.','warn');
+  try{const r=await api(`/api/candidates/listing/logistics?shopId=${encodeURIComponent(d.selectedShopId)}`);const list=arr(r.logisticsChannels);state.logisticsCache[String(d.selectedShopId)]=list;const usable=list.filter(x=>{const flag=x?.enabled??x?.is_enabled??x?.isEnabled??x?.status;if(flag===undefined||flag===null||flag==='')return true;if(typeof flag==='boolean')return flag;if(typeof flag==='number')return flag>0;return !/disable|inactive|closed|off/i.test(String(flag))});if(!d.logistics.length&&usable.length===1){const id=logisticId(usable[0]);if(id)d.logistics=[id]}renderEditor();flash(`물류채널 ${list.length}개를 불러왔어.${(!d.logistics.length&&usable.length>1)?' 여러 채널 중 사용할 것을 확인해줘.':''}`)}catch(e){flash(e.message,'bad')}
+}
+async function uploadImages(c,d){
+  const input=$('#imageFiles'),files=[...(input?.files||[])];if(!files.length)return flash('업로드할 이미지 파일을 선택해줘.','warn');
+  if(!d.selectedShopId)return flash('등록 대상 Shop을 먼저 선택해줘.','warn');
+  if(d.imageIds.length+files.length>9)return flash('기존 image_id와 합쳐 최대 9개까지만 업로드할 수 있어.','warn');
+  if(state.busy)return;state.busy=true;
+  try{
+    for(let i=0;i<files.length;i++){
+      const f=files[i];flash(`${i+1}/${files.length} ${f.name} 업로드 중...`,'warn');
+      const form=new FormData();form.append('confirm','UPLOAD_IMAGE');form.append('shopId',String(d.selectedShopId));form.append('image',f,f.name);
+      const r=await api('/api/candidates/listing/upload-image',{method:'POST',body:form});
+      d.imageUploads.push({imageId:r.imageId,imageUrl:r.imageUrl||'',fileName:r.fileName||f.name,size:r.size||f.size,shopId:Number(d.selectedShopId),uploadedAt:now()});
+    }
+    d.imageUploads=d.imageUploads.slice(0,9);d.imageIds=d.imageUploads.map(x=>x.imageId).filter(Boolean);touch(d);await saveCandidate(c,{quiet:true});renderAll();flash(`${files.length}개 이미지를 Shopee Media에 업로드했어.`);
+  }catch(e){flash(e.message,'bad')}finally{state.busy=false}
+}
+async function runPreflight(c,code,d){
+  if(state.busy)return;state.busy=true;
+  const btn=$('#runPreflight');
+  const before=btn?.textContent||'서버 최종검사 실행';
+  if(btn){btn.disabled=true;btn.textContent='서버 검사 중...'}
+  try{
+    const metadata=state.attributeCache[attrCacheKey(d)]||[];if(metadata.length)rebuildAttributes(d,metadata);
+    await saveCandidate(c,{quiet:true});
+    const r=await api('/api/candidates/listing/preflight',{method:'POST',body:{candidateId:c.id,marketCode:code}});
+    d.preflight=r;await saveCandidate(c,{quiet:true});renderAll();flash(r.ready?(state.listingStatus.environment==='sandbox'&&state.listingStatus.sandboxPublishEnabled?'서버 최종검사를 통과했어. 이제 Sandbox 테스트 등록이 가능해.':'서버 최종검사를 통과했어. 상품등록은 현재 잠금 상태야.'):`최종검사에서 ${arr(r.blockers).length}개 차단 사유를 찾았어.`,r.ready?'ok':'warn');
+  }catch(e){
+    d.preflight={checkedAt:now(),ready:false,blockers:[e.message],warnings:[]};
+    renderAll();
+    flash(e.message,'bad');
+  }finally{
+    state.busy=false;
+    const current=$('#runPreflight');if(current){current.disabled=false;current.textContent=before}
+  }
+}
+
+async function verifyPublishedItem(c,code,d){
+  if(state.busy)return;
+  const itemId=d.publishReceipt?.itemId||currentPublishAttempt(c,code)?.itemId;
+  if(!itemId)return flash('재확인할 Shopee item_id가 없어.','warn');
+  state.busy=true;
+  const btn=$('#verifyPublishedItem');
+  if(btn){btn.disabled=true;btn.textContent='Shopee에서 재조회 중...'}
+  try{
+    const r=await api('/api/candidates/listing/item-verify',{method:'POST',body:{candidateId:c.id,marketCode:code}});
+    flash(r.message||'생성상품을 Shopee API에서 다시 확인했어.');
+    await load();
+    state.selectedId=c.id;state.market=code;renderAll();
+  }catch(e){flash(e.message,'bad')}finally{state.busy=false}
+}
+
+async function publishSandbox(c,code,d,confirmText){
+  if(state.busy)return;
+  if(state.listingStatus.environment!=='sandbox'||!state.listingStatus.sandboxPublishEnabled)return flash('Sandbox 등록 안전스위치가 꺼져 있어.','bad');
+  if(!d.preflight?.ready)return flash('서버 최종검사를 먼저 통과해야 해.','warn');
+  const phrase=`SANDBOX PUBLISH ${code}`;
+  if(confirmText!==phrase)return flash(`확인문구를 정확히 입력해줘: ${phrase}`,'warn');
+  if(!window.confirm(`${market(code).name} Sandbox에 UNLIST 테스트 상품 1개를 실제 생성할까?\nProduction 상점에는 영향 없어.`))return;
+  state.busy=true;
+  const statusEl=$('#sandboxPublishStatus'),btn=$('#sandboxPublish');
+  if(statusEl)statusEl.textContent='Shopee Sandbox에 등록 요청 중...';
+  if(btn){btn.disabled=true;btn.textContent='등록 요청 중...'}
+  try{
+    const r=await api('/api/candidates/listing/publish',{method:'POST',body:{candidateId:c.id,marketCode:code,confirm:'SANDBOX_PUBLISH',confirmText:phrase}});
+    await loadPublishAttempt(c,code);
+    flash(r.message||'Sandbox 테스트 상품을 생성했어.');
+    await load();
+  }catch(e){
+    await loadPublishAttempt(c,code);
+    if(statusEl)statusEl.textContent=`등록 실패: ${e.message}`;
+    renderAll();
+    flash(e.message,'bad');
+  }finally{state.busy=false}
+}
+function renderSummary(){
+  const c=candidate(),body=$('#packageRows');if(!c){body.innerHTML='<tr><td colspan="8" class="empty">후보상품이 없어.</td></tr>';return}
+  body.innerHTML=MARKETS.map(m=>{const d=draft(c,m.code),r=clientReadiness(c,m.code),ps=prepStatus(c,m.code);const status=d.preflight?.ready?'<span class="ok">최종검사 통과</span>':ps.key==='COMPLETE'?'<span class="ok">자동준비 완료</span>':ps.key==='BLOCKED'?'<span class="bad">차단</span>':'<span class="warn">확인필요</span>';const detail=ps.issues.length?`<div class="tiny">${esc(ps.issues.join(' · '))}</div>`:'';return `<tr><td>${m.name}</td><td>${d.enabled?'ON':'OFF'}</td><td>${esc(d.title||'-')}</td><td>${localPrice(d.priceLocal,m.cur)}</td><td>${d.categoryId?`${esc(d.categoryName||'')} #${esc(d.categoryId)}`:(arr(d.categorySuggestions).length?`후보 ${d.categorySuggestions.length}개`:'-')}</td><td>${d.mandatoryAttributeIds.length?`${d.mandatoryAttributeIds.length-missingMandatoryCount(d)}/${d.mandatoryAttributeIds.length}`:'-'}</td><td>${d.imageIds.length}/9</td><td>${status}${detail}</td></tr>`}).join('');
+}
+function renderAll(){renderMetrics();renderCandidateSelect();renderHeader();renderMarketTabs();renderEditor();renderSummary()}
+
+$('#candidateSelect').onchange=async e=>{state.selectedId=e.target.value;renderAll();const c=candidate();if(c){await loadPublishAttempt(c,state.market);renderAll()}};
+$('#prepareAllMarkets')?.addEventListener('click',()=>{const c=candidate();if(c)prepareAllListingDrafts(c)});
+$('#prepareMetadataAll')?.addEventListener('click',()=>{const c=candidate();if(c)prepareAllMarketMetadata(c)});
+$('#seedSandbox').onclick=()=>seedSandboxCandidate();
+$('#exportAll').onclick=()=>{const c=candidate();if(!c)return;saveBlob(`japanova-${c.id}-all-listing-packages.json`,{schema:'JAPANOVA_LISTING_BUNDLE_V2',generatedAt:now(),candidateId:c.id,candidateName:c.name,packages:Object.fromEntries(MARKETS.map(m=>[m.code,buildPackage(c,m.code)]))})};
+$('#navResearch').onclick=()=>location.href='./sourcing.html';$('#navValidation').onclick=()=>location.href='./sourcing.html';$('#navOps').onclick=()=>location.href='./v08.html';
+
+load().catch(e=>{flash(`불러오기 실패: ${e.message}`,'bad');$('#editor').innerHTML='<div class="empty">데이터를 불러오지 못했어.</div>'});
+})();
