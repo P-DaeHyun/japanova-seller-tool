@@ -937,7 +937,7 @@ function bindEditor(c,code,d){
   $('#enabled').onchange=async e=>{d.enabled=e.target.checked;touch(d);await saveCandidate(c,{quiet:true});renderAll()};
   $('#autoPrepareDraft')?.addEventListener('click',()=>prepareListingDraftFromCandidate(c,code));
   bind('title','title');bind('sku','sku',cleanSku);bind('price','priceLocal',Number);bind('stock','initialStock',v=>state.listingStatus.environment==='sandbox'?Math.max(2,Math.min(100000,Math.floor(Number(v)||0))):Math.max(1,Math.floor(Number(v)||0)));bind('weight','weightG',Number);bind('length','lengthCm',Number);bind('width','widthCm',Number);bind('height','heightCm',Number);bind('gtin','gtin');bind('description','description');
-  $('#shop').onchange=async e=>{d.selectedShopId=e.target.value?Number(e.target.value):null;d.categoryId='';d.categoryName='';d.logistics=[];d.attributes=[];d.mandatoryAttributeIds=[];d.attributeValues={};touch(d);await saveCandidate(c,{quiet:true});renderAll()};
+  $('#shop').onchange=async e=>{const next=e.target.value?Number(e.target.value):null;resetEnvironmentBoundDraft(d,currentShopeeEnv());d.selectedShopId=next;stampEnvironmentMetadata(d);d.categoryId='';d.categoryName='';d.categorySuggestions=[];d.logistics=[];d.attributes=[];d.attributeMeta=[];d.mandatoryAttributeIds=[];d.attributeValues={};touch(d);await saveCandidate(c,{quiet:true});renderAll()};
   bind('categoryId','categoryId',v=>Number(v)||'');bind('categoryName','categoryName');
   $('#imageUrls').onchange=async e=>{d.imageUrls=String(e.target.value||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0,9);touch(d);await saveCandidate(c,{quiet:true});renderAll()};
   $('#loadCategories')?.addEventListener('click',()=>loadCategories(d));
@@ -1122,6 +1122,8 @@ function renderAll(){renderMetrics();renderCandidateSelect();renderHeader();rend
 $('#candidateSelect').onchange=async e=>{state.selectedId=e.target.value;renderAll();const c=candidate();if(c){await loadPublishAttempt(c,state.market);renderAll()}};
 $('#prepareAllMarkets')?.addEventListener('click',()=>{const c=candidate();if(c)prepareAllListingDrafts(c)});
 $('#prepareMetadataAll')?.addEventListener('click',()=>{const c=candidate();if(c)prepareAllMarketMetadata(c)});
+$('#productionScan')?.addEventListener('click',()=>{const c=candidate();if(c)prepareProductionReadOnlyMetadata(c)});
+$('#productionAuthorize')?.addEventListener('click',openProductionAuthorization);
 $('#matchAttributesAll')?.addEventListener('click',()=>{const c=candidate();if(c)autoMatchCommonAttributes(c)});
 $('#seedSandbox').onclick=()=>seedSandboxCandidate();
 $('#exportAll').onclick=()=>{const c=candidate();if(!c)return;saveBlob(`japanova-${c.id}-all-listing-packages.json`,{schema:'JAPANOVA_LISTING_BUNDLE_V2',generatedAt:now(),candidateId:c.id,candidateName:c.name,packages:Object.fromEntries(MARKETS.map(m=>[m.code,buildPackage(c,m.code)]))})};
