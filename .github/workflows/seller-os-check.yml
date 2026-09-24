@@ -47,7 +47,7 @@ jobs:
           node --check src/routes/candidates.js
           node --check src/routes/research.js
           test -f ../db/candidates.sql
-          grep -q '"version": "2.1.4"' package.json
+          grep -q '"version": "2.2.0"' package.json
           grep -q 'multer' package.json
 
       - name: Check stable frontend JavaScript syntax
@@ -66,6 +66,7 @@ jobs:
           node --check ../listing-prep-v19.js
           node --check ../listing-prep-v20.js
           node --check ../listing-prep-v21.js
+          node --check ../listing-prep-v22.js
           node --check ../sourcing-v2.js
           node --check ../sourcing-v1.js
 
@@ -155,3 +156,8 @@ jobs:
           grep -q '기준속성 0개' ../listing-prep-v21.js
           python -c 'from pathlib import Path; s=Path("../listing-prep-v21.js").read_text(); assert "$(\x27.attrSelect\x27).forEach" in s' # attrSelect runtime binding
           grep -q '공통속성 자동매칭' ../listing-prep-v21.js
+          test -f ../v22.html
+          grep -q 'listing-prep-v22.js' ../v22.html
+          grep -q '6개국 기준시장 자동선택·속성전파' ../v22.html
+          grep -q 'selectAttributeReferenceMarket' ../listing-prep-v22.js
+          grep -q '자동 기준시장' ../listing-prep-v22.js
