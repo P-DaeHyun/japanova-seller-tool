@@ -58,11 +58,12 @@ function num(sel){return Number($(sel)?.value||0)||0}
 function setVal(sel,v){if($(sel))$(sel).value=v??''}
 function flash(msg,type='ok'){const b=$('#flash');if(!b)return;b.textContent=msg;b.className=`flash ${type}`;b.hidden=false;clearTimeout(flash.t);flash.t=setTimeout(()=>b.hidden=true,4500)}
 async function api(path,opts={}){const r=await fetch(`${API}${path}`,{...opts,headers:{'Content-Type':'application/json',...(opts.headers||{})}});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(body.message||`HTTP ${r.status}`);return body}
+function withTimeout(promise,ms=8000,label='요청'){return Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error(`${label} 시간초과`)),ms))])}
 
 async function loadReference(){
   const [calc,fx]=await Promise.all([
     fetch('../data.json',{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error('국가별 수수료/SLS 데이터를 불러오지 못했습니다.');return r.json()}),
-    api('/api/fx').catch(async()=>{const r=await fetch('../fx.json',{cache:'no-store'});if(!r.ok)throw new Error('환율 데이터를 불러오지 못했습니다.');return r.json()})
+    withTimeout(api('/api/fx'),8000,'환율 서버').catch(async()=>{const r=await fetch('../fx.json',{cache:'no-store'});if(!r.ok)throw new Error('환율 데이터를 불러오지 못했습니다.');return r.json()})
   ]);
   state.calcData=calc;state.fx=fx;
   $('#dataVersion').textContent=`요금 ${calc.dataVersion||'-'} · 환율 ${fx.sourceDate||'-'}`;
@@ -70,10 +71,11 @@ async function loadReference(){
 async function loadCandidates(){
   const cached=readLocal();
   try{
-    const r=await api('/api/candidates');state.dbStorage=true;let server=Array.isArray(r.candidates)?r.candidates:[];
+    $('#status').textContent='반자동 소싱 · DB 연결 중';$('#status').className='badge';
+    const r=await withTimeout(api('/api/candidates'),8000,'후보상품 DB');state.dbStorage=true;let server=Array.isArray(r.candidates)?r.candidates:[];
     if(!server.length&&cached.length){const moved=[];for(const c of cached){try{const s=await api(`/api/candidates/${encodeURIComponent(c.id)}`,{method:'PUT',body:JSON.stringify(c)});moved.push(s.candidate||c)}catch{moved.push(c)}}server=moved}
     state.candidates=server;saveLocal();$('#status').textContent='반자동 소싱 · DB 저장';$('#status').className='badge ok';
-  }catch{state.dbStorage=false;state.candidates=cached;$('#status').textContent='반자동 소싱 · 로컬 백업';$('#status').className='badge warn'}
+  }catch{state.dbStorage=false;state.candidates=cached;$('#status').textContent='반자동 소싱 · 로컬 백업';$('#status').className='badge warn';setTimeout(async()=>{try{const r=await api('/api/candidates');state.dbStorage=true;const server=Array.isArray(r.candidates)?r.candidates:[];if(server.length){state.candidates=server;saveLocal();state.selectedId=state.selectedId||server[0]?.id||null;renderAll();if(state.selectedId)openCandidate(state.selectedId)}$('#status').textContent='반자동 소싱 · DB 저장';$('#status').className='badge ok'}catch{}},15000)}
 }
 async function persistCandidate(c,{silent=false}={}){
   c.updatedAt=new Date().toISOString();saveLocal();
@@ -186,6 +188,7 @@ function exportCandidates(){const blob=new Blob([JSON.stringify({version:'1.0',e
 async function importCandidates(file){try{const raw=JSON.parse(await file.text());const list=Array.isArray(raw)?raw:raw.candidates;if(!Array.isArray(list))throw new Error('후보상품 배열을 찾을 수 없어.');state.candidates=list;saveLocal();if(state.dbStorage){for(const c of list)await persistCandidate(c,{silent:true})}state.selectedId=list[0]?.id||null;renderAll();if(state.selectedId)openCandidate(state.selectedId);flash(`${list.length}개 후보상품을 복원했어.`)}catch(e){flash(`복원 실패: ${e.message}`,'bad')}}
 
 async function boot(){
+  $('#status').textContent='반자동 소싱 · 초기화 중';$('#dataVersion').textContent='요금·환율 불러오는 중';
   try{await loadReference();await loadCandidates();renderAll();if(state.candidates.length)openCandidate(state.candidates[0].id);else newCandidate()}
   catch(e){$('#status').textContent='소싱 초기화 오류';$('#status').className='badge bad';flash(e.message,'bad')}
 }
