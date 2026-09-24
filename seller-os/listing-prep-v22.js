@@ -232,6 +232,29 @@ async function ensureAttributeMetadata(c,code,d){
   rebuildAttributes(d,list);
   return list;
 }
+function sandboxSemanticMetadataBlocked(){
+  return String(state.listingStatus?.environment||'').toLowerCase()==='sandbox';
+}
+function applyCommonFieldsOnly(c,codes){
+  let count=0;
+  const jan=String(srcMeta(c).jan||'').trim();
+  for(const code of codes){
+    const d=draft(c,code),matched=[];
+    if(jan&&!String(d.gtin||'').trim()){d.gtin=jan;matched.push('JAN/GTIN');count++}
+    for(const [key,val,label] of [['weightG',c.weightG,'중량'],['lengthCm',c.lengthCm,'가로'],['widthCm',c.widthCm,'세로'],['heightCm',c.heightCm,'높이']]){
+      if(!(Number(d[key])>0)&&Number(val)>0){d[key]=Number(val);matched.push(label);count++}
+    }
+    d.commonFieldMatches=matched;
+    d.autoAttributeMatches=[];
+    d.autoAttributePending=[];
+    d.autoAttributeReference={
+      market:null,marketName:'Sandbox 테스트 메타데이터',filled:0,filledMandatory:0,mandatoryTotal:0,metadataTotal:0,
+      mode:'sandbox-synthetic',selectedAt:now()
+    };
+    touch(d);
+  }
+  return count;
+}
 function attributeReferenceStats(c,code){
   const d=draft(c,code);
   const facts=sourceAttributeFacts(c).filter(f=>f.sourceMarket===code);
@@ -278,6 +301,13 @@ async function autoMatchCommonAttributes(c,{onlyCode=null}={}){
     for(const sourceCode of prepared){
       const sd=draft(c,sourceCode);
       try{await ensureAttributeMetadata(c,sourceCode,sd)}catch{}
+    }
+
+    if(sandboxSemanticMetadataBlocked()){
+      const commonFields=applyCommonFieldsOnly(c,eligible);
+      await saveCandidate(c,{quiet:true});renderAll();
+      flash('Sandbox에서는 Shopee가 Ethan test category, jlie_*, test_* 같은 가짜 속성 메타데이터를 내려줘서 의미 기반 6개국 속성전파를 검증할 수 없어. 실제 상품속성은 입력하지 말고, JAN/중량/치수 같은 공통필드 '+commonFields+'개만 처리했어. Production 연결 후 실제 카테고리 메타데이터에서 자동 기준시장·속성전파가 활성화돼.','warn');
+      return;
     }
 
     const choice=selectAttributeReferenceMarket(c,prepared);
@@ -721,7 +751,9 @@ function renderAttributeFields(d){
 function renderAttributeMatchInfo(d){
   const matches=arr(d.autoAttributeMatches),pending=arr(d.autoAttributePending),ref=d.autoAttributeReference||null;
   if(!matches.length&&!pending.length&&!ref)return '';
-  const refText=ref?`<div><b>자동 기준시장</b> · ${esc(ref.marketName||ref.market)}(${esc(ref.market)}) · 입력속성 ${fmt(ref.filled||0)} · 필수 ${fmt(ref.filledMandatory||0)}/${fmt(ref.mandatoryTotal||0)} · 전체속성 ${fmt(ref.metadataTotal||0)}</div>`:'';
+  const refText=ref?.mode==='sandbox-synthetic'
+    ? '<div class="warnList"><b>Sandbox 테스트 속성</b> · Shopee Sandbox의 카테고리/속성은 실제 판매용 메타데이터가 아니어서 의미 기반 자동매칭을 하지 않아.</div>'
+    : (ref?`<div><b>자동 기준시장</b> · ${esc(ref.marketName||ref.market)}(${esc(ref.market)}) · 입력속성 ${fmt(ref.filled||0)} · 필수 ${fmt(ref.filledMandatory||0)}/${fmt(ref.mandatoryTotal||0)} · 전체속성 ${fmt(ref.metadataTotal||0)}</div>`:'');
   return `<div class="metaBox">${refText}<div><b>공통속성 자동매칭</b> · 자동입력 ${matches.length} · 확인필요 ${pending.length}</div>
     ${matches.length?`<div class="chips">${matches.slice(0,8).map(x=>`<span>✓ ${esc(x.attributeName)} ← ${esc(x.sourceMarket)}</span>`).join('')}</div>`:''}
     ${pending.length?`<div class="warnList">확인필요: ${pending.slice(0,6).map(x=>esc(x.attributeName)).join(' · ')}</div>`:''}
