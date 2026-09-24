@@ -246,9 +246,12 @@ app.get('/api/shopee/connections', async (_req, res) => {
       `select market_code, merchant_id, shop_id, shop_name, main_account_id,
               authorization_expires_at, access_token_expires_at,
               refresh_token_expires_at, status, last_sync_at, updated_at
-       from shopee_connections order by market_code nulls last, shop_id`
+       from shopee_connections
+       where environment=$1
+       order by market_code nulls last, shop_id`,
+      [shopeeEnvironment()]
     );
-    res.json({ connections: result.rows });
+    res.json({ environment: shopeeEnvironment(), readOnly: shopeeReadOnly(), connections: result.rows });
   } catch (error) { res.status(500).json(safeError(error)); }
 });
 app.get('/api/shopee/shop/:shopId', async (req, res) => {
@@ -288,7 +291,8 @@ app.post('/api/shopee/sync-all', async (req, res) => {
   if (!requireDb(res)) return;
   try {
     const connections = await query(
-      `select shop_id, market_code from shopee_connections where status='CONNECTED' order by market_code`
+      `select shop_id, market_code from shopee_connections where environment=$1 and status='CONNECTED' order by market_code`,
+      [shopeeEnvironment()]
     );
     const results = [];
     for (const row of connections.rows) {
@@ -666,7 +670,7 @@ app.get('/api/dashboard', async (_req, res) => {
   if (!requireDb(res)) return;
   try {
     const [shops, ordersToday, profit30, markets, inventory] = await Promise.all([
-      query(`select count(*)::int as n from shopee_connections where status='CONNECTED'`),
+      query(`select count(*)::int as n from shopee_connections where environment=$1 and status='CONNECTED'`, [shopeeEnvironment()]),
       query(`select count(*)::int as orders, coalesce(sum(total_amount*fx_jpy_per),0)::numeric as sales_jpy
              from orders where created_time_shopee >= date_trunc('day',now())`),
       query(`select coalesce(sum(ps.actual_profit_jpy),0)::numeric as profit_jpy
