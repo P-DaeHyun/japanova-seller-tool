@@ -207,11 +207,11 @@ app.get('/api/shopee/callback', async (req, res) => {
       if (hasDb()) {
         await query(
           `insert into shopee_connections(
-             market_code, merchant_id, shop_id, shop_name, main_account_id,
+             environment, market_code, merchant_id, shop_id, shop_name, main_account_id,
              access_token_encrypted, refresh_token_encrypted,
              access_token_expires_at, refresh_token_expires_at, status, updated_at
-           ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'CONNECTED',now())
-           on conflict (shop_id) do update set
+           ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'CONNECTED',now())
+           on conflict (environment, shop_id) do update set
              market_code=excluded.market_code, merchant_id=excluded.merchant_id,
              shop_name=excluded.shop_name, main_account_id=excluded.main_account_id,
              access_token_encrypted=excluded.access_token_encrypted,
@@ -220,7 +220,7 @@ app.get('/api/shopee/callback', async (req, res) => {
              refresh_token_expires_at=excluded.refresh_token_expires_at,
              status='CONNECTED', updated_at=now()`,
           [
-            marketCode, merchantId, Number(id), shopName,
+            shopeeEnvironment(), marketCode, merchantId, Number(id), shopName,
             mainAccountId ? Number(mainAccountId) : null,
             encryptSecret(token.access_token), encryptSecret(token.refresh_token),
             accessExpiresAt, refreshExpiresAt
