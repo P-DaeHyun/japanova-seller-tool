@@ -451,7 +451,8 @@ function renderAttributeFields(d){
     ? `<div class="attrCard ${brandMeta.isMandatory?'required':''}"><div class="attrHead"><b>Brand</b><span>${brandMeta.isMandatory?'필수':'선택'} · Shopee 브랜드</span></div><select id="brandSelect" class="select"><option value="">브랜드 선택</option>${brands.map(b=>`<option value="${esc(b.brand_id)}" ${Number(d.brandId)===Number(b.brand_id)?'selected':''}>${esc(b.display_brand_name||b.original_brand_name||('Brand '+b.brand_id))}</option>`).join('')}</select><div class="tiny">Shopee get_brand_list 기준</div></div>`
     : '';
   if(!metadata.length)return brandField||'<div class="empty smallEmpty">카테고리 선택 후 “속성 불러오기”를 눌러줘.</div>';
-  const sorted=[...metadata].sort((a,b)=>Number(attrMandatory(b))-Number(attrMandatory(a))||attrName(a).localeCompare(attrName(b)));\n  const visible=state.missingOnly[state.market]?sorted.filter(meta=>attrMandatory(meta)&&!attrValuePresent(d,attrId(meta))):sorted;
+  const sorted=[...metadata].sort((a,b)=>Number(attrMandatory(b))-Number(attrMandatory(a))||attrName(a).localeCompare(attrName(b)));
+  const visible=state.missingOnly[state.market]?sorted.filter(meta=>attrMandatory(meta)&&!attrValuePresent(d,attrId(meta))):sorted;
   return `<div class="attrGrid">${brandField}${visible.length?visible.map(meta=>{
     const id=attrId(meta),saved=d.attributeValues[id]||{},options=attrOptions(meta),required=attrMandatory(meta),multi=isMultiAttr(meta);
     const selected=new Set(arr(saved.valueIds).map(String));
