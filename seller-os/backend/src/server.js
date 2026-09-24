@@ -115,7 +115,8 @@ app.get('/api/markets', async (_req, res) => {
     if (hasDb()) {
       const result = await query(
         `select market_code, count(*)::int as shops, max(last_sync_at) as last_sync_at
-         from shopee_connections where status='CONNECTED' group by market_code`
+         from shopee_connections where environment=$1 and status='CONNECTED' group by market_code`,
+        [shopeeEnvironment()]
       );
       connectionMap = Object.fromEntries(result.rows.map(r => [r.market_code, r]));
     }
