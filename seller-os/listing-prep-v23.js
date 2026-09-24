@@ -785,12 +785,28 @@ function renderCandidateSelect(){
   el.disabled=false;el.innerHTML=state.candidates.map(c=>`<option value="${esc(c.id)}" ${c.id===state.selectedId?'selected':''}>${c.status==='READY'?'✅':'⛔'} ${esc(c.name)} · ${esc(c.status)}</option>`).join('');
 }
 function renderHeader(){
-  const env=state.listingStatus.environment||'unknown',conns=arr(state.listingStatus.connections).length;
-  const sandboxOn=env==='sandbox'&&state.listingStatus.sandboxPublishEnabled;
-  const publishLabel=sandboxOn?'Sandbox add_item ON':state.listingStatus.productionPublishEnabled?'Production add_item ON':'add_item 잠금';
+  const env=state.listingStatus.environment||'unknown',conns=arr(state.listingStatus.connections).length,readOnly=Boolean(state.listingStatus.readOnly);
+  const sandboxOn=env==='sandbox'&&state.listingStatus.sandboxPublishEnabled&&!readOnly;
+  const publishLabel=readOnly?'READ ONLY':sandboxOn?'Sandbox add_item ON':state.listingStatus.productionPublishEnabled?'Production add_item ON':'add_item 잠금';
   $('#apiStatus').textContent=`${env} · 연결 Shop ${conns} · ${publishLabel}`;
-  $('#apiStatus').className=`badge ${conns?(sandboxOn?'warn':'ok'):'warn'}`;
-  if($('#seedSandbox')) $('#seedSandbox').disabled=env!=='sandbox';
+  $('#apiStatus').className=`badge ${env==='production'&&readOnly&&conns?'ok':conns?'warn':'warn'}`;
+  const notice=$('#modeNotice');
+  if(notice){
+    if(env==='production'&&readOnly){
+      notice.className='notice';
+      notice.innerHTML='<b>Production READ ONLY</b> · 실제 Shop의 카테고리/속성/브랜드/물류는 조회할 수 있지만 상품 생성(add_item), Media 업로드, 출고 같은 Shopee 변경 작업은 서버에서 차단돼 있어.';
+    }else if(env==='sandbox'){
+      notice.className='notice warn';
+      notice.innerHTML='<b>Sandbox 검증 완료</b> · 실제 6개국 메타데이터 조회 단계로 넘어가려면 백엔드를 Production Partner 자격증명으로 전환하고 Production Shop 인증을 해야 해. 현재 Sandbox 가짜 속성은 실전 자동매칭에 사용하지 않아.';
+    }else{
+      notice.className='notice';
+      notice.textContent='Shopee 환경 상태를 확인 중이야.';
+    }
+  }
+  if($('#seedSandbox')) $('#seedSandbox').disabled=env!=='sandbox'||readOnly;
+  if($('#productionScan')) $('#productionScan').disabled=!(env==='production'&&readOnly&&conns>0);
+  if($('#productionAuthorize')) $('#productionAuthorize').disabled=env!=='production';
+  if($('#matchAttributesAll')) $('#matchAttributesAll').disabled=env==='sandbox';
 }
 function renderMarketTabs(){
   const c=candidate();$('#marketTabs').innerHTML=MARKETS.map(m=>{const d=c?draft(c,m.code):null;const r=c?clientReadiness(c,m.code):null;const ps=c?prepStatus(c,m.code):null;let label='대기';if(d?.preflight?.ready)label='최종검사 통과';else if(ps?.key==='COMPLETE')label='자동준비 완료';else if(ps?.key==='CONFIRM')label='확인필요';else if(ps?.key==='BLOCKED')label='차단';else if(r?.ready)label='검사 가능';else if(d?.enabled)label='작성중';return `<button class="marketTab ${state.market===m.code?'on':''}" data-market="${m.code}">${m.name}<small>${label}${m.future?' · 향후':''}</small></button>`}).join('');
