@@ -18,7 +18,7 @@ const fmt=(n,d=0)=>Number.isFinite(Number(n))?Number(n).toLocaleString('ko-KR',{
 const now=()=>new Date().toISOString();
 const uniq=(a)=>[...new Set(a)];
 const arr=(v)=>Array.isArray(v)?v:[];
-let state={candidates:[],selectedId:null,market:'TW',listingStatus:{environment:'unknown',connections:[]},categoryCache:{},attributeCache:{},brandCache:{},logisticsCache:{},publishAttemptCache:{},busy:false};
+let state={candidates:[],selectedId:null,market:'TW',listingStatus:{environment:'unknown',connections:[]},categoryCache:{},attributeCache:{},brandCache:{},logisticsCache:{},publishAttemptCache:{},missingOnly:{},busy:false};
 
 async function api(path,opts={}){
   const headers={...(opts.headers||{})};
@@ -451,8 +451,8 @@ function renderAttributeFields(d){
     ? `<div class="attrCard ${brandMeta.isMandatory?'required':''}"><div class="attrHead"><b>Brand</b><span>${brandMeta.isMandatory?'필수':'선택'} · Shopee 브랜드</span></div><select id="brandSelect" class="select"><option value="">브랜드 선택</option>${brands.map(b=>`<option value="${esc(b.brand_id)}" ${Number(d.brandId)===Number(b.brand_id)?'selected':''}>${esc(b.display_brand_name||b.original_brand_name||('Brand '+b.brand_id))}</option>`).join('')}</select><div class="tiny">Shopee get_brand_list 기준</div></div>`
     : '';
   if(!metadata.length)return brandField||'<div class="empty smallEmpty">카테고리 선택 후 “속성 불러오기”를 눌러줘.</div>';
-  const sorted=[...metadata].sort((a,b)=>Number(attrMandatory(b))-Number(attrMandatory(a))||attrName(a).localeCompare(attrName(b)));
-  return `<div class="attrGrid">${brandField}${sorted.map(meta=>{
+  const sorted=[...metadata].sort((a,b)=>Number(attrMandatory(b))-Number(attrMandatory(a))||attrName(a).localeCompare(attrName(b)));\n  const visible=state.missingOnly[state.market]?sorted.filter(meta=>attrMandatory(meta)&&!attrValuePresent(d,attrId(meta))):sorted;
+  return `<div class="attrGrid">${brandField}${visible.length?visible.map(meta=>{
     const id=attrId(meta),saved=d.attributeValues[id]||{},options=attrOptions(meta),required=attrMandatory(meta),multi=isMultiAttr(meta);
     const selected=new Set(arr(saved.valueIds).map(String));
     let field='';
@@ -460,7 +460,7 @@ function renderAttributeFields(d){
       field=`<select class="select attrSelect" data-attr-id="${esc(id)}" ${multi?'multiple size="5"':''}><option value="">${multi?'복수 선택 가능':'선택 안 함'}</option>${options.map(o=>`<option value="${esc(optionId(o))}" ${selected.has(optionId(o))?'selected':''}>${esc(optionName(o))}</option>`).join('')}</select>`;
     }else field=`<input class="input attrText" data-attr-id="${esc(id)}" value="${esc(saved.text||'')}" placeholder="속성값 입력">`;
     return `<div class="attrCard ${required?'required':''}"><div class="attrHead"><b>${esc(attrName(meta))}</b><span>${required?'필수':'선택'} · ID ${esc(id)}</span></div>${field}<div class="tiny">${esc(attrInputType(meta)||'자유입력/선택')}</div></div>`;
-  }).join('')}</div>`;
+  }).join(''):'<div class="empty smallEmpty">미입력 필수속성이 없어.</div>'}</div>`;
 }
 function renderImages(d){
   const uploads=d.imageUploads.length?d.imageUploads.map((x,i)=>`<div class="imageChip"><div><b>${esc(x.fileName||`이미지 ${i+1}`)}</b><small>${esc(x.imageId||'')}</small></div><button class="mini red" data-remove-image="${i}">삭제</button></div>`).join(''):'<div class="muted">아직 Shopee Media에 업로드된 이미지가 없어.</div>';
