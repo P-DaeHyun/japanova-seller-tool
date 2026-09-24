@@ -47,7 +47,7 @@ jobs:
           node --check src/routes/candidates.js
           node --check src/routes/research.js
           test -f ../db/candidates.sql
-          grep -q '"version": "2.2.0"' package.json
+          grep -q '"version": "2.2.1"' package.json
           grep -q 'multer' package.json
 
       - name: Check stable frontend JavaScript syntax
@@ -161,3 +161,5 @@ jobs:
           grep -q '6개국 기준시장 자동선택·속성전파' ../v22.html
           grep -q 'selectAttributeReferenceMarket' ../listing-prep-v22.js
           grep -q '자동 기준시장' ../listing-prep-v22.js
+          grep -q 'sandboxSemanticMetadataBlocked' ../listing-prep-v22.js
+          grep -q 'Sandbox 테스트 속성' ../listing-prep-v22.js
