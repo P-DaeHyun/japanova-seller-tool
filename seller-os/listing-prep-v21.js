@@ -165,7 +165,7 @@ function sourceAttributeFacts(c){
   const facts=[];
   const priority=['TW','SG','MY','TH','PH','VN'];
   for(const code of priority){
-    const d=draft(c,code);
+    const d=draft(c,code),seen=new Set();
     for(const a of arr(d.attributes)){
       const id=String(a.attribute_id??a.attributeId??'');
       const name=attrMetaName(d,id);if(!name)continue;
@@ -174,7 +174,16 @@ function sourceAttributeFacts(c){
         unit:String(v.value_unit??'').trim()
       })).filter(v=>v.text);
       if(!values.length)continue;
+      seen.add(id);
       facts.push({key:canonicalAttrName(name),name,values,sourceMarket:code,sourceAttributeId:id});
+    }
+    for(const meta of arr(d.attributeMeta)){
+      const id=String(meta?.id??'');if(!id||seen.has(id))continue;
+      const name=String(meta?.name||'').trim();if(!name)continue;
+      const saved=d.attributeValues?.[id]||{};
+      const texts=uniq([...(arr(saved.selectedTexts)),String(saved.text||'').trim()].map(x=>String(x||'').trim()).filter(Boolean));
+      if(!texts.length)continue;
+      facts.push({key:canonicalAttrName(name),name,values:texts.map(text=>({text,unit:String(saved.unit||'')})),sourceMarket:code,sourceAttributeId:id});
     }
   }
   return facts;
@@ -240,10 +249,7 @@ async function autoMatchCommonAttributes(c,{onlyCode=null}={}){
       try{await ensureAttributeMetadata(c,sourceCode,sd)}catch{}
     }
     const facts=sourceAttributeFacts(c);
-    if(!facts.length){
-      flash('입력된 속성값을 찾지 못했어. 대만의 필수속성 값이 저장돼 있는지 확인해줘.','warn');
-      return;
-    }
+    const sourceMarkets=uniq(facts.map(f=>f.sourceMarket));
     for(const code of eligible){
       const d=draft(c,code),metadata=await ensureAttributeMetadata(c,code,d);
       const common=[];
@@ -270,7 +276,9 @@ async function autoMatchCommonAttributes(c,{onlyCode=null}={}){
       touch(d);
     }
     await saveCandidate(c,{quiet:true});renderAll();
-    flash('6개국 공통속성 자동매칭 완료 · 속성 자동입력 '+applied+'개 · 공통필드 '+commonFields+'개 · 확인필요 '+pending+'개. 브랜드는 Shopee 브랜드 목록에서 이름이 고신뢰도로 일치할 때만 자동 선택하고, 애매한 옵션은 비워뒀어.',pending?'warn':'ok');
+    const sourceNote=facts.length?'기준속성 '+facts.length+'개('+sourceMarkets.join('/')+')':'기준속성 0개';
+    const msg='6개국 공통속성 자동매칭 완료 · '+sourceNote+' · 속성 자동입력 '+applied+'개 · 공통필드 '+commonFields+'개 · 확인필요 '+pending+'개.'+(facts.length?' 애매한 옵션은 자동입력하지 않았어.':' 현재 기준 국가 카테고리에 재사용할 속성값이 없어 JAN/중량/치수/브랜드 같은 공통필드만 처리했어.');
+    flash(msg,(pending||!facts.length)?'warn':'ok');
   }catch(e){flash(e.message,'bad')}finally{state.busy=false}
 }
 function prepStatus(c,code){
@@ -767,7 +775,7 @@ function bindEditor(c,code,d){
     d.brandMandatory=Boolean(meta.isMandatory);
     touch(d);await saveCandidate(c,{quiet:true});renderAll();
   });
-  $$('.attrSelect').forEach(el=>el.onchange=async()=>{const id=String(el.dataset.attrId);const meta=(state.attributeCache[attrCacheKey(d)]||[]).find(x=>attrId(x)===id);const vals=[...el.selectedOptions].map(o=>o.value).filter(Boolean);d.attributeValues[id]={valueIds:isMultiAttr(meta)?vals:vals.slice(0,1),text:''};rebuildAttributes(d,state.attributeCache[attrCacheKey(d)]||[]);touch(d);await saveCandidate(c,{quiet:true});renderAll()});
+  $('.attrSelect').forEach(el=>el.onchange=async()=>{const id=String(el.dataset.attrId);const meta=(state.attributeCache[attrCacheKey(d)]||[]).find(x=>attrId(x)===id);const opts=[...el.selectedOptions].filter(o=>o.value);const vals=opts.map(o=>o.value);d.attributeValues[id]={valueIds:isMultiAttr(meta)?vals:vals.slice(0,1),selectedTexts:opts.map(o=>o.textContent.trim()),text:''};rebuildAttributes(d,state.attributeCache[attrCacheKey(d)]||[]);touch(d);await saveCandidate(c,{quiet:true});renderAll()});
   $$('.attrText').forEach(el=>el.onchange=async()=>{const id=String(el.dataset.attrId);d.attributeValues[id]={valueIds:[],text:el.value.trim()};rebuildAttributes(d,state.attributeCache[attrCacheKey(d)]||[]);touch(d);await saveCandidate(c,{quiet:true});renderAll()});
   $$('.logisticCheck').forEach(el=>el.onchange=async()=>{d.logistics=$$('.logisticCheck:checked').map(x=>Number(x.value)).filter(Boolean);touch(d);await saveCandidate(c,{quiet:true});renderAll()});
   $('#uploadImages')?.addEventListener('click',()=>uploadImages(c,d));
