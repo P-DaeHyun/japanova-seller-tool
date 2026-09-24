@@ -47,7 +47,7 @@ jobs:
           node --check src/routes/candidates.js
           node --check src/routes/research.js
           test -f ../db/candidates.sql
-          grep -q '"version": "1.7.0"' package.json
+          grep -q '"version": "1.8.0"' package.json
           grep -q 'multer' package.json
 
       - name: Check stable frontend JavaScript syntax
@@ -62,6 +62,7 @@ jobs:
           node --check ../listing-prep-v15.js
           node --check ../listing-prep-v16.js
           node --check ../listing-prep-v17.js
+          node --check ../listing-prep-v18.js
           node --check ../sourcing-v1.js
 
       - name: Check preview inline JavaScript syntax
@@ -125,3 +126,6 @@ jobs:
           grep -q 'FREE SEMI-AUTO SOURCING' ../sourcing.html
           grep -q 'URL 분석' ../sourcing.html
           grep -q 'candidateId' ../listing-prep-v17.js
+          test -f ../v18.html
+          grep -q 'listing-prep-v18.js' ../v18.html
+          grep -q 'Sandbox 등록재고는 2~100000개' ../listing-prep-v18.js
