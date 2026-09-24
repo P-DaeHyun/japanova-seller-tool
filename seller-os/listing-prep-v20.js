@@ -533,7 +533,7 @@ function renderEditor(){
       </div><div class="metaBox">현재 환경: <b>${esc(state.listingStatus.environment||'unknown')}</b><br>이 화면은 카테고리/속성/물류 조회와 이미지 Media 업로드만 하고 상품 생성은 하지 않아.</div></section>
     </div>
     <div class="section grid2">
-      <section class="cardInner"><div class="section-head"><div><h3>3. 카테고리 속성</h3><p>필수속성을 위로 정렬해. 선택형은 Shopee 옵션을 사용하고 자유입력형은 value_id=0으로 준비해.</p></div></div>${renderAttributeFields(d)}</section>
+      <section class="cardInner"><div class="section-head"><div><h3>3. 카테고리 속성</h3><p>필수속성을 우선 정리하고, 이미 입력된 값은 숨겨서 남은 것만 볼 수 있어.</p></div><label class="tiny"><input id="missingOnly" type="checkbox" ${state.missingOnly[code]?'checked':''}> 미입력 필수만 보기</label></div>${renderAttributeFields(d)}</section>
       <section class="cardInner"><div class="section-head"><div><h3>4. 물류 채널</h3><p>현재 연결 Shop에서 사용할 채널만 선택해.</p></div></div>${renderLogistics(d)}</section>
     </div>
     <div class="section grid2">
