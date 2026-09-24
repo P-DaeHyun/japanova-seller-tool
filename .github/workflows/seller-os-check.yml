@@ -133,6 +133,6 @@ jobs:
           grep -q 'Sandbox 등록재고는 2~100000개' ../listing-prep-v18.js
           test -f ../v19.html
           grep -q 'listing-prep-v19.js' ../v19.html
-          grep -q '판매후보 전체 등록초안' ../listing-prep-v19.js
+          grep -q 'prepareAllListingDrafts' ../listing-prep-v19.js
           grep -q '판매후보 전체 초안 생성' ../sourcing.html
           grep -q 'prepareAllListingDrafts' ../sourcing-v2.js
