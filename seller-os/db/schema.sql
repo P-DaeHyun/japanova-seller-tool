@@ -14,9 +14,10 @@ create table if not exists markets (
 
 create table if not exists shopee_connections (
   id bigserial primary key,
+  environment text not null default 'sandbox',
   market_code text references markets(code),
   merchant_id bigint,
-  shop_id bigint unique,
+  shop_id bigint,
   shop_name text,
   main_account_id bigint,
   authorization_expires_at timestamptz,
@@ -29,6 +30,18 @@ create table if not exists shopee_connections (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table shopee_connections
+  add column if not exists environment text not null default 'sandbox';
+
+alter table shopee_connections
+  drop constraint if exists shopee_connections_shop_id_key;
+
+create unique index if not exists uq_shopee_connections_environment_shop
+  on shopee_connections(environment, shop_id);
+
+create index if not exists idx_shopee_connections_environment_status
+  on shopee_connections(environment, status, market_code);
 
 create table if not exists fx_rates (
   id bigserial primary key,
