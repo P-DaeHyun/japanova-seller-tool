@@ -624,8 +624,14 @@ async function loadAttributes(c,code,d){
     const list=arr(r.attributeList);
     state.attributeCache[attrCacheKey(d)]=list;
     state.brandCache[attrCacheKey(d)]=brandR||{brandList:[],isMandatory:false};
+    d.attributeMeta=list.map(x=>({id:attrId(x),name:attrName(x),mandatory:attrMandatory(x)}));
     d.brandMandatory=Boolean(brandR?.isMandatory);
     const brands=arr(brandR?.brandList);
+    const wantedBrand=normText(String(srcMeta(c).brand||d.brandName||MARKETS.map(m=>draft(c,m.code).brandName).find(Boolean)||''));
+    if(!d.brandId&&wantedBrand){
+      const match=brands.find(b=>{const n=normText(b.display_brand_name||b.original_brand_name||'');return n===wantedBrand||(wantedBrand.length>2&&(n.includes(wantedBrand)||wantedBrand.includes(n)))});
+      if(match){d.brandId=Number(match.brand_id);d.brandName=String(match.display_brand_name||match.original_brand_name||'');d.brandOriginalName=String(match.original_brand_name||match.display_brand_name||'')}
+    }
     if(d.brandMandatory && !d.brandId){
       const noBrand=brands.find(b=>/^(no brand|無品牌|無牌|none)$/i.test(String(b.display_brand_name||b.original_brand_name||'').trim()));
       const auto=noBrand||(brands.length===1?brands[0]:null);
@@ -642,7 +648,7 @@ async function loadAttributes(c,code,d){
 }
 async function loadLogistics(d){
   if(!d.selectedShopId)return flash('Shop을 먼저 선택해줘.','warn');
-  try{const r=await api(`/api/candidates/listing/logistics?shopId=${encodeURIComponent(d.selectedShopId)}`);state.logisticsCache[String(d.selectedShopId)]=arr(r.logisticsChannels);renderEditor();flash(`물류채널 ${arr(r.logisticsChannels).length}개를 불러왔어.`)}catch(e){flash(e.message,'bad')}
+  try{const r=await api(`/api/candidates/listing/logistics?shopId=${encodeURIComponent(d.selectedShopId)}`);const list=arr(r.logisticsChannels);state.logisticsCache[String(d.selectedShopId)]=list;const usable=list.filter(x=>{const flag=x?.enabled??x?.is_enabled??x?.isEnabled??x?.status;if(flag===undefined||flag===null||flag==='')return true;if(typeof flag==='boolean')return flag;if(typeof flag==='number')return flag>0;return !/disable|inactive|closed|off/i.test(String(flag))});if(!d.logistics.length&&usable.length===1){const id=logisticId(usable[0]);if(id)d.logistics=[id]}renderEditor();flash(`물류채널 ${list.length}개를 불러왔어.${(!d.logistics.length&&usable.length>1)?' 여러 채널 중 사용할 것을 확인해줘.':''}`)}catch(e){flash(e.message,'bad')}
 }
 async function uploadImages(c,d){
   const input=$('#imageFiles'),files=[...(input?.files||[])];if(!files.length)return flash('업로드할 이미지 파일을 선택해줘.','warn');
