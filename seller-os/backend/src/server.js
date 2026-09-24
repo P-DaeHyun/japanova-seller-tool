@@ -48,6 +48,8 @@ app.use(cors({
 app.use(express.json({ limit: '1mb' }));
 
 function hasDb() { return Boolean(process.env.DATABASE_URL); }
+function shopeeEnvironment(){ return String(process.env.SHOPEE_ENV || 'sandbox').trim().toLowerCase(); }
+function shopeeReadOnly(){ return String(process.env.SHOPEE_READ_ONLY || '').trim().toLowerCase() === 'true'; }
 function safeError(error) { return { error: true, message: error?.message || '알 수 없는 오류가 발생했습니다.' }; }
 function requireDb(res) {
   if (hasDb()) return true;
@@ -96,10 +98,11 @@ app.get('/api/health', async (_req, res) => {
   }
   res.json({
     service: 'JAPANOVA Seller OS Backend',
-    version: '0.9.0',
+    version: '2.3.0',
     status: '정상',
     database: db,
-    shopeeEnvironment: process.env.SHOPEE_ENV || 'sandbox',
+    shopeeEnvironment: shopeeEnvironment(),
+    shopeeReadOnly: shopeeReadOnly(),
     apiAuthEnabled: Boolean(sellerOsApiKey),
     markets: Object.keys(MARKETS),
     now: new Date().toISOString()
@@ -166,7 +169,7 @@ app.get('/api/shopee/authorize-url', (_req, res) => {
   try {
     res.json({
       message: 'Shopee 인증 URL을 생성했습니다.',
-      environment: process.env.SHOPEE_ENV || 'sandbox',
+      environment: shopeeEnvironment(),
       redirectUri: process.env.SHOPEE_REDIRECT_URI || null,
       url: buildAuthorizationUrl()
     });
