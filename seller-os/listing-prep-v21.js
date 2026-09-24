@@ -210,7 +210,16 @@ async function ensureAttributeMetadata(c,code,d){
   ]);
   const list=arr(r.attributeList);state.attributeCache[key]=list;state.brandCache[key]=brandR||{brandList:[],isMandatory:false};
   d.attributeMeta=list.map(x=>({id:attrId(x),name:attrName(x),mandatory:attrMandatory(x),inputType:attrInputType(x)}));
-  d.brandMandatory=Boolean(brandR?.isMandatory);rebuildAttributes(d,list);
+  d.brandMandatory=Boolean(brandR?.isMandatory);
+  if(!d.brandId){
+    const wanted=normText(String(srcMeta(c).brand||MARKETS.map(m=>draft(c,m.code).brandName).find(Boolean)||''));
+    if(wanted){
+      const brands=arr(brandR?.brandList);
+      const hit=brands.find(b=>{const n=normText(b.display_brand_name||b.original_brand_name||'');return n===wanted||(wanted.length>2&&(n.includes(wanted)||wanted.includes(n)))});
+      if(hit){d.brandId=Number(hit.brand_id);d.brandName=String(hit.display_brand_name||hit.original_brand_name||'');d.brandOriginalName=String(hit.original_brand_name||hit.display_brand_name||'')}
+    }
+  }
+  rebuildAttributes(d,list);
   return list;
 }
 async function autoMatchCommonAttributes(c,{onlyCode=null}={}){
@@ -222,10 +231,17 @@ async function autoMatchCommonAttributes(c,{onlyCode=null}={}){
   if(!eligible.length)return flash('공통속성을 매칭할 최종 카테고리가 준비된 국가가 없어.','warn');
   const facts=sourceAttributeFacts(c);
   if(!facts.length)return flash('기준이 될 입력 속성이 아직 없어. 대만처럼 한 국가의 필수속성을 먼저 완성해줘.','warn');
-  state.busy=true;let applied=0,pending=0;
+  state.busy=true;let applied=0,pending=0,commonFields=0;
   try{
     for(const code of eligible){
       const d=draft(c,code),metadata=await ensureAttributeMetadata(c,code,d);
+      const common=[];
+      const jan=String(srcMeta(c).jan||'').trim();
+      if(jan&&!String(d.gtin||'').trim()){d.gtin=jan;common.push('JAN/GTIN');commonFields++}
+      for(const [key,val,label] of [['weightG',c.weightG,'중량'],['lengthCm',c.lengthCm,'가로'],['widthCm',c.widthCm,'세로'],['heightCm',c.heightCm,'높이']]){
+        if(!(Number(d[key])>0)&&Number(val)>0){d[key]=Number(val);common.push(label);commonFields++}
+      }
+      d.commonFieldMatches=common;
       const matches=[];const needs=[];
       for(const meta of metadata){
         const id=attrId(meta);if(!id||attrValuePresent(d,id))continue;
@@ -243,7 +259,7 @@ async function autoMatchCommonAttributes(c,{onlyCode=null}={}){
       touch(d);
     }
     await saveCandidate(c,{quiet:true});renderAll();
-    flash('6개국 공통속성 자동매칭 완료 · 자동입력 '+applied+'개 · 확인필요 '+pending+'개. 옵션명이 정확히 맞지 않는 값은 자동으로 넣지 않았어.',pending?'warn':'ok');
+    flash('6개국 공통속성 자동매칭 완료 · 속성 자동입력 '+applied+'개 · 공통필드 '+commonFields+'개 · 확인필요 '+pending+'개. 브랜드는 Shopee 브랜드 목록에서 이름이 고신뢰도로 일치할 때만 자동 선택하고, 애매한 옵션은 비워뒀어.',pending?'warn':'ok');
   }catch(e){flash(e.message,'bad')}finally{state.busy=false}
 }
 function prepStatus(c,code){
