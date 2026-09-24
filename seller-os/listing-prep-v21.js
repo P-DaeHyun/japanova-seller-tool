@@ -229,10 +229,20 @@ async function autoMatchCommonAttributes(c,{onlyCode=null}={}){
     const p=plan(c,code),d=draft(c,code);return p.regulationStatus==='OK'&&p.decision==='SELL'&&d.selectedShopId&&Number(d.categoryId)>0;
   });
   if(!eligible.length)return flash('공통속성을 매칭할 최종 카테고리가 준비된 국가가 없어.','warn');
-  const facts=sourceAttributeFacts(c);
-  if(!facts.length)return flash('기준이 될 입력 속성이 아직 없어. 대만처럼 한 국가의 필수속성을 먼저 완성해줘.','warn');
   state.busy=true;let applied=0,pending=0,commonFields=0;
   try{
+    const prepared=MARKETS.filter(m=>!m.future).map(m=>m.code).filter(code=>{
+      const d=draft(c,code);return d.selectedShopId&&Number(d.categoryId)>0;
+    });
+    for(const sourceCode of prepared){
+      const sd=draft(c,sourceCode);
+      try{await ensureAttributeMetadata(c,sourceCode,sd)}catch{}
+    }
+    const facts=sourceAttributeFacts(c);
+    if(!facts.length){
+      flash('입력된 속성값을 찾지 못했어. 대만의 필수속성 값이 저장돼 있는지 확인해줘.','warn');
+      return;
+    }
     for(const code of eligible){
       const d=draft(c,code),metadata=await ensureAttributeMetadata(c,code,d);
       const common=[];
