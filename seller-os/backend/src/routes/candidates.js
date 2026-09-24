@@ -117,7 +117,12 @@ function basicDraftBlockers(candidate, marketCode, draft, plan) {
   if (!(Number(draft?.priceLocal) > 0)) blockers.push('판매가가 확정되지 않았어.');
   if (!(Number(draft?.weightG) > 0)) blockers.push('포장 후 중량이 필요해.');
   if (!(Number(draft?.categoryId) > 0)) blockers.push('Shopee 카테고리가 선택되지 않았어.');
-  if (!(Number(draft?.initialStock) > 0)) blockers.push('등록 재고가 1개 이상이어야 해.');
+  const stockQty = Math.floor(Number(draft?.initialStock) || 0);
+  if (shopeeEnvironment() === 'sandbox') {
+    if (stockQty < 2 || stockQty > 100000) blockers.push('Sandbox 등록 재고는 2~100000개여야 해.');
+  } else if (stockQty < 1) {
+    blockers.push('등록 재고가 1개 이상이어야 해.');
+  }
   if (!arr(draft?.imageIds).length) blockers.push('Shopee image_id가 하나 이상 필요해.');
   if (arr(draft?.imageIds).length > 9) blockers.push('상품 이미지는 최대 9개까지만 준비해.');
   if (!arr(draft?.logistics).length) blockers.push('사용할 물류 채널을 하나 이상 선택해야 해.');
@@ -181,7 +186,7 @@ function buildAddItemPayload(draft) {
       .map(id => ({ logistic_id: Number(id), enabled: true }))
       .filter(x => x.logistic_id > 0),
     attribute_list: arr(draft.attributes),
-    seller_stock: [{ stock: Math.max(0, Math.floor(Number(draft.initialStock) || 0)) }],
+    seller_stock: [{ stock: Math.max(0, Math.min(100000, Math.floor(Number(draft.initialStock) || 0))) }],
     item_status: 'UNLIST'
   };
 }
@@ -723,7 +728,15 @@ router.post('/listing/publish', async (req, res) => {
           && priorError.includes('product.error_desc_len_no_pass')
           && String(candidate?.plans?.[marketCode]?.listingDraft?.description || '').trim().length >= 1
           && String(candidate?.plans?.[marketCode]?.listingDraft?.description || '').trim().length <= 200;
-        if (safeBrandRetry || safeDescriptionRetry) {
+        const stockQty = Math.floor(Number(candidate?.plans?.[marketCode]?.listingDraft?.initialStock) || 0);
+        const safeStockRetry = shopeeEnvironment() === 'sandbox'
+          && a.status === 'REVIEW'
+          && !a.itemId
+          && priorError.includes('product.error_busi')
+          && priorError.includes('Stock should be within 2-100000')
+          && stockQty >= 2
+          && stockQty <= 100000;
+        if (safeBrandRetry || safeDescriptionRetry || safeStockRetry) {
           await client.query(`delete from listing_publish_attempts where id=$1`, [existing.rows[0].id]);
         } else {
           const msg = a.status === 'SUCCEEDED'
