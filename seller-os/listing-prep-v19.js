@@ -615,6 +615,7 @@ function renderSummary(){
 function renderAll(){renderMetrics();renderCandidateSelect();renderHeader();renderMarketTabs();renderEditor();renderSummary()}
 
 $('#candidateSelect').onchange=async e=>{state.selectedId=e.target.value;renderAll();const c=candidate();if(c){await loadPublishAttempt(c,state.market);renderAll()}};
+$('#prepareAllMarkets')?.addEventListener('click',()=>{const c=candidate();if(c)prepareAllListingDrafts(c)});
 $('#seedSandbox').onclick=()=>seedSandboxCandidate();
 $('#exportAll').onclick=()=>{const c=candidate();if(!c)return;saveBlob(`japanova-${c.id}-all-listing-packages.json`,{schema:'JAPANOVA_LISTING_BUNDLE_V2',generatedAt:now(),candidateId:c.id,candidateName:c.name,packages:Object.fromEntries(MARKETS.map(m=>[m.code,buildPackage(c,m.code)]))})};
 $('#navResearch').onclick=()=>location.href='./sourcing.html';$('#navValidation').onclick=()=>location.href='./sourcing.html';$('#navOps').onclick=()=>location.href='./v08.html';
