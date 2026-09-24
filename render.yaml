@@ -12,6 +12,12 @@ services:
         value: production
       - key: SHOPEE_ENV
         value: production
+      - key: SHOPEE_READ_ONLY
+        value: "true"
+      - key: SHOPEE_PUBLISH_ENABLED
+        value: "false"
+      - key: SHOPEE_SANDBOX_PUBLISH_ENABLED
+        value: "false"
       - key: ALLOWED_ORIGIN
         value: https://p-daehyun.github.io
       - key: PAYONEER_RATE
