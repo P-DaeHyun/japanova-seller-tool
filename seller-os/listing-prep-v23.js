@@ -846,6 +846,9 @@ function renderAttributeMatchInfo(d){
 }
 function renderImages(d){
   const uploads=d.imageUploads.length?d.imageUploads.map((x,i)=>`<div class="imageChip"><div><b>${esc(x.fileName||`이미지 ${i+1}`)}</b><small>${esc(x.imageId||'')}</small></div><button class="mini red" data-remove-image="${i}">삭제</button></div>`).join(''):'<div class="muted">아직 Shopee Media에 업로드된 이미지가 없어.</div>';
+  if(state.listingStatus.readOnly){
+    return `<div class="metaBox"><b>READ ONLY</b> · 실제 상품 생성 전 단계라 Shopee Media 업로드는 서버에서 잠겨 있어. 원본 이미지 URL만 보관하고, Production 등록 승인 단계에서 Shop별 image_id를 만들 거야.</div><div class="imageList">${uploads}</div>`;
+  }
   return `<div class="uploadBox"><input id="imageFiles" class="input fileInput" type="file" accept="image/jpeg,image/png" multiple><button class="btn" id="uploadImages" ${d.selectedShopId?'':'disabled'}>선택 이미지 Shopee에 업로드</button><div class="tiny">JPG/JPEG/PNG · 파일당 최대 10MB · 전체 상품이미지 최대 9개. 업로드는 버튼을 눌렀을 때만 실행돼.</div></div><div class="imageList">${uploads}</div>`;
 }
 function renderLogistics(d){
@@ -860,6 +863,9 @@ function renderPreflight(d){
 }
 
 function renderSandboxPublish(c,code,d){
+  if(state.listingStatus.environment==='production'&&state.listingStatus.readOnly){
+    return `<section class="cardInner"><div class="section-head"><div><h3>7. Production 일괄등록</h3><p>현재는 실제 메타데이터 검증 단계야.</p></div></div><div class="gate"><b>🔒 READ ONLY 잠금</b> · add_item, Media 업로드, 출고 처리는 서버에서 차단돼 있어. 6개국 실제 카테고리·필수속성·브랜드·물류 검증이 끝난 뒤 별도 승인으로 등록 기능을 열 거야.</div></section>`;
+  }
   const isSandbox=state.listingStatus.environment==='sandbox';
   const enabled=isSandbox&&state.listingStatus.sandboxPublishEnabled;
   const ready=Boolean(d.preflight?.ready);
