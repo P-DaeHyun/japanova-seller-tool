@@ -3,7 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto,{randomUUID} from "node:crypto";
 import {fileURLToPath} from "node:url";
-import {Pool} from "pg";
+import pg from "pg";
+const {Pool}=pg;
 import Stripe from "stripe";
 import {calculateBaziChart} from "@openfate/bazi-engine";
 
