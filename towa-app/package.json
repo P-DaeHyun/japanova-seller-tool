@@ -1,0 +1,9 @@
+{
+  "name":"towa-v0.8-beta",
+  "version":"0.8.0",
+  "private":true,
+  "type":"module",
+  "scripts":{"start":"node server.js"},
+  "engines":{"node":">=22"},
+  "dependencies":{"@openfate/bazi-engine":"2.0.0","pg":"8.13.1","stripe":"23.0.0"}
+}
