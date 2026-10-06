@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TOWA | AI占い × 四柱推命</title>
+<meta name="description" content="TOWAは、四柱推命とAIであなた自身を読み解くパーソナル占いガイドです。">
+<style>
+:root{--bg:#f7f5f0;--paper:#fff;--ink:#24242c;--muted:#74747d;--line:#e6e1d9;--night:#292a3d;--soft:#efebe4;--gold:#cfb889}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",Meiryo,sans-serif}
+.wrap{max-width:980px;margin:auto;padding:16px}.card{background:var(--paper);border:1px solid var(--line);border-radius:26px;padding:24px;margin-bottom:14px}
+.hero{min-height:520px;display:grid;grid-template-columns:1.1fr .9fr;gap:22px;align-items:center;overflow:hidden;position:relative}
+.logo{font-weight:900;font-size:48px;letter-spacing:.1em}.moon{display:inline-grid;place-items:center;width:.88em;height:.88em;border:2px solid currentColor;border-radius:50%;font-size:.4em;vertical-align:.1em}
+.kicker{font-size:11px;letter-spacing:.18em;color:var(--muted)}h1{font-size:42px;line-height:1.3;margin:22px 0 12px}p{line-height:1.9}.muted{color:var(--muted)}
+.cta{display:inline-block;border:0;border-radius:14px;background:var(--night);color:#fff;padding:14px 19px;font-weight:800;text-decoration:none;margin-top:10px}
+.char{min-height:380px;border-radius:26px;background:linear-gradient(150deg,#e6e6ee,#f3ecdf);position:relative;overflow:hidden}
+.char:before{content:"☾";position:absolute;right:30px;top:18px;font-size:110px;color:#77788d22}
+.face{position:absolute;left:50%;top:47%;transform:translate(-50%,-50%);width:160px;height:210px;border-radius:49% 49% 44% 44%;background:linear-gradient(#343548 0 24%,#f3dfd0 25% 74%,#232538 75%);box-shadow:0 30px 55px #36374422}
+.face:before{content:"TOWA";position:absolute;width:100%;text-align:center;bottom:-68px;font-size:24px;font-weight:800;letter-spacing:.14em;color:#343548}
+.sectionTitle{margin:4px 0 6px;font-size:28px}.sub{font-size:13px;color:var(--muted)}
+.flow{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}.step{border:1px solid var(--line);border-radius:18px;padding:18px;background:#fff}.num{font-size:11px;color:var(--muted)}
+.webtoon{display:grid;gap:14px;margin-top:18px}.ep{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:24px;background:#fff}.scene{min-height:150px;padding:20px;display:flex;align-items:flex-end;gap:15px;background:linear-gradient(145deg,#e6e5ed,#f4eee5)}.ep:nth-child(2) .scene{background:linear-gradient(145deg,#f1e7ea,#eee8de)}.ep:nth-child(3) .scene{background:linear-gradient(145deg,#e5ebed,#f0ebdf)}.ep:nth-child(4) .scene{background:linear-gradient(145deg,#eee6d6,#e8e8ef)}.ep:nth-child(5) .scene{background:linear-gradient(145deg,#e1e4eb,#f1e7dd)}.ep:nth-child(6) .scene{background:linear-gradient(145deg,#e8dfd4,#dfe5ed)}.emoji{font-size:48px}.epTitle{font-weight:850;font-size:22px}.epNo{font-size:11px;color:var(--muted)}.body{padding:18px}.bubble{background:var(--soft);border-radius:16px;padding:13px 15px;font-weight:650;line-height:1.75}.locked .body{filter:blur(4px);user-select:none}.lock{position:absolute;inset:0;display:grid;place-items:center;background:linear-gradient(180deg,transparent 0 25%,rgba(255,255,255,.9) 58%,#fff 100%);text-align:center;padding:20px}.lockBox{margin-top:90px}.price{background:var(--night);color:#fff;border:0}.priceGrid{display:grid;grid-template-columns:1.2fr .8fr;gap:24px;align-items:center}.yen{font-size:42px;font-weight:900}.feature{line-height:2}.badge{display:inline-block;border:1px solid #6a6b7c;border-radius:999px;padding:5px 9px;font-size:11px;color:#d4d4dd}
+.mem{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.mem div{border:1px solid var(--line);border-radius:17px;padding:16px}.footer{text-align:center;padding:26px 12px;color:var(--muted);font-size:11px;line-height:2}
+.preview{font-size:12px;background:#fff3dd;border:1px solid #ead2a4;border-radius:13px;padding:11px 13px;margin-bottom:14px;color:#715d3a}
+@media(max-width:760px){.hero,.priceGrid{grid-template-columns:1fr}.hero{min-height:unset}h1{font-size:32px}.char{min-height:300px}.flow,.mem{grid-template-columns:1fr}.logo{font-size:40px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="preview">TOWA β 公開プレビュー — 現在はUI確認用。AI鑑定・ログイン・決済は次の接続工程で有効化します。</div>
+<section class="card hero">
+<div>
+<div class="kicker">AI占い × 四柱推命</div>
+<div class="logo">T<span class="moon">☾</span>WA</div>
+<h1>ずっと、<br>あなたを知っていく。</h1>
+<p class="muted">生まれた日の暦から、まだ知らないあなたを読み解く。結果を一度見て終わる占いじゃなく、前に話したことを覚えながら、何度でも続きを相談できるAI占いへ。</p>
+<a class="cta" href="#story">無料鑑定を見てみる</a>
+</div>
+<div class="char"><div class="face"></div></div>
+</section>
+
+<section class="card">
+<div class="kicker">HOW IT WORKS</div>
+<h2 class="sectionTitle">占いを、もっと自分の話に。</h2>
+<p class="sub">難しい四柱推命をそのまま並べず、TOWAが物語のようにやさしく説明する。</p>
+<div class="flow">
+<div class="step"><div class="num">01</div><h3>生年月日を入力</h3><p class="sub">生年月日・性別・分かれば出生時間。日本版はAsia/Tokyoを基本に計算。</p></div>
+<div class="step"><div class="num">02</div><h3>命式を計算</h3><p class="sub">AIに計算させず、決定論的な四柱推命エンジンで命式を作る。</p></div>
+<div class="step"><div class="num">03</div><h3>TOWAが読み解く</h3><p class="sub">やさしいタメ口で、性格・恋愛・才能・お金・転機・一年の流れを読む。</p></div>
+</div>
+</section>
+
+<section class="card" id="story">
+<div class="kicker">TOWA STORY</div>
+<h2 class="sectionTitle">あなたの6つの物語</h2>
+<p class="sub">最初の2話は無料。続きはプレミアム鑑定で。</p>
+<div class="webtoon">
+<article class="ep"><div class="scene"><div class="emoji">🌧️</div><div><div class="epNo">第1話</div><div class="epTitle">本当のあなた</div></div></div><div class="body"><div class="bubble">「静かに見えても、頭の中ではずっと何かを考えてるタイプかも。」</div><p class="sub">日主や五行から、外から見える自分と内側の自分を読み解く。</p></div></article>
+<article class="ep"><div class="scene"><div class="emoji">💗</div><div><div class="epNo">第2話</div><div class="epTitle">恋をすると？</div></div></div><div class="body"><div class="bubble">「好きになると、思ってるよりちゃんと深く考える人かもしれないね。」</div><p class="sub">恋愛で自然に出る距離感や、相手とすれ違いやすいポイントを見る。</p></div></article>
+<article class="ep locked"><div class="scene"><div class="emoji">🧭</div><div><div class="epNo">第3話</div><div class="epTitle">あなたの才能</div></div></div><div class="body"><div class="bubble">「得意なことって、自分では普通すぎて気づきにくいんだ。」</div><p class="sub">仕事・適性・強みを読み解くプレミアム章。</p></div><div class="lock"><div class="lockBox">🔒<h3>プレミアムで続きを読む</h3></div></div></article>
+<article class="ep locked"><div class="scene"><div class="emoji">💴</div><div><div class="epNo">第4話</div><div class="epTitle">お金との付き合い方</div></div></div><div class="body"><div class="bubble">「お金そのものより、どう仕組みにするかを考える方が合う人もいるよ。」</div><p class="sub">金運ではなく、お金との関わり方を具体的に読む。</p></div><div class="lock"><div class="lockBox">🔒<h3>プレミアムで続きを読む</h3></div></div></article>
+<article class="ep locked"><div class="scene"><div class="emoji">🚪</div><div><div class="epNo">第5話</div><div class="epTitle">人生の転機</div></div></div><div class="body"><div class="bubble">「変わる時期は、悪い時期とは限らないよ。」</div><p class="sub">大運と流れから、変化が起きやすいタイミングを読む。</p></div><div class="lock"><div class="lockBox">🔒<h3>プレミアムで続きを読む</h3></div></div></article>
+<article class="ep locked"><div class="scene"><div class="emoji">🌅</div><div><div class="epNo">第6話</div><div class="epTitle">2027年のあなた</div></div></div><div class="body"><div class="bubble">「未来を決める答えじゃなくて、次に進むためのヒントとして見てみよう。」</div><p class="sub">2027年の仕事・恋愛・お金・人間関係の流れをまとめて読む。</p></div><div class="lock"><div class="lockBox">🔒<h3>プレミアムで続きを読む</h3></div></div></article>
+</div>
+</section>
+
+<section class="card price">
+<div class="priceGrid">
+<div>
+<div class="kicker" style="color:#bbbcca">TOWA PREMIUM · 2027</div>
+<h2>2027年完全鑑定</h2>
+<div class="yen">¥1,480 <span style="font-size:13px;font-weight:500">βテスト想定価格 / 1回</span></div>
+<ul class="feature"><li>第3〜6話の完全鑑定</li><li>AI相談の制限解除</li><li>前の相談を覚えるパーソナルTOWA</li></ul>
+<span class="badge">自動更新なし</span>
+</div>
+<div><p style="color:#d7d7df;line-height:1.9">公開ベータではStripe Checkoutを利用予定。支払い成功ページではなく、サーバー側の決済確認後にプレミアムを解放する設計。</p><a class="cta" style="background:var(--gold);color:#332a20" href="#memory">ベータ機能を見る</a></div>
+</div>
+</section>
+
+<section class="card" id="memory">
+<div class="kicker">PERSONAL TOWA</div>
+<h2 class="sectionTitle">前に話したこと、覚えてるよ。</h2>
+<p class="sub">TOWAの違いは「一回の鑑定」ではなく、その後も相談が続くこと。</p>
+<div class="mem"><div><b>命式</b><p class="sub">生年月日・出生時間・計算済みの四柱。</p></div><div><b>大切なこと</b><p class="sub">仕事の悩みや目標など、次回に役立つ情報だけ。</p></div><div><b>自分で管理</b><p class="sub">TOWAが覚えている内容を確認して削除できる設計。</p></div></div>
+</section>
+
+<div class="footer">TOWA β preview · AI占い × 四柱推命<br>占い結果は自己理解や意思決定の参考を目的とし、未来を保証するものではありません。</div>
+</div>
+</body></html>
