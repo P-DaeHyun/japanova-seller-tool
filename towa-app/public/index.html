@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TOWA v0.11.3</title>
+<title>TOWA v0.11.4</title>
 <style>
 :root{--ink:#20212b;--navy:#292c4b;--paper:#fffdfa;--line:#e7ded3;--muted:#766f73;--gold:#b68035;--cream:#f7f1e8}
 *{box-sizing:border-box}
@@ -104,13 +104,13 @@ pre{white-space:pre-wrap;font-size:12px}
 <section class="card hero">
   <div class="copy">
     <div class="logo">T☾WA<small>データで読み解く四柱推命</small></div>
-    <span class="beta">v0.11.3 · TOWA MAP</span>
+    <span class="beta">v0.11.4 · TOWA MAP</span>
     <h1>あなたという人の<br>地図をひらく。</h1>
     <p class="muted">生まれた日の暦を計算し、変わりにくいあなたの核と、今動いている流れを重ねて読む。未来を決めつけるためじゃなく、自分の選び方を知るための四柱推命だよ。</p>
     <div id="infra" class="status">接続状態を確認中…</div>
   </div>
   <div class="visual">
-    <img class="art heroArt" src="/assets/towa-character.webp?v=0113..." alt="TOWA">
+    <img class="art heroArt" src="/assets/towa-warm.webp?v=0114" alt="TOWA">
     <div class="heroShade"></div>
     <div class="heroPill">ずっと、あなたを知っていく。</div>
   </div>
@@ -144,7 +144,15 @@ pre{white-space:pre-wrap;font-size:12px}
 </div>
 
 <script>
-const ART="/assets/towa-character.webp?v=0113...";
+const TOWA_ART={
+  hero:"/assets/towa-warm.webp?v=0114",
+  core:"/assets/towa-calm.webp?v=0114",
+  flow:"/assets/towa-calm.webp?v=0114",
+  path:"/assets/towa-serious.webp?v=0114",
+  turning:"/assets/towa-serious.webp?v=0114",
+  next:"/assets/towa-serious-bright.webp?v=0114",
+  letter:"/assets/towa-warm.webp?v=0114"
+};
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 const api=async(u,o={})=>{const r=await fetch(u,{...o,headers:{"Content-Type":"application/json",...(o.headers||{})}});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"error");return d};
@@ -167,12 +175,20 @@ function scene(key){const s=SCENE[key];return s?'<div class="scene"><b>こんな
 function noteLabel(key){return({CORE:"TOWA KEY",FLOW:"覚えておいて",TURNING:"TOWA KEY",NEXT:"今できること",LETTER:"TOWA NOTE",work:"今のヒント",money:"今のヒント",love:"今のヒント",people:"今のヒント"}[key]||"TOWA NOTE")}
 function termHints(text){const xs=Object.keys(TERM).filter(k=>String(text||"").includes(k));return xs.length?'<div class="terms">'+xs.map(k=>'<span class="term"><b>'+k+'</b><small>'+esc(TERM[k])+'</small></span>').join("")+'</div>':""}
 function artClass(label){return label==="CORE"?"art-core":label==="FLOW"?"art-flow":label==="PATH"?"art-path":label==="TURNING POINT"?"art-turning":label==="NEXT"?"art-next":"art-core"}
+function artFor(label){
+  if(label==="CORE")return TOWA_ART.core;
+  if(label==="FLOW")return TOWA_ART.flow;
+  if(label==="PATH")return TOWA_ART.path;
+  if(label==="TURNING POINT")return TOWA_ART.turning;
+  if(label==="NEXT")return TOWA_ART.next;
+  return TOWA_ART.calm;
+}
 
 async function health(){try{const h=await api("/api/health");$("#infra").textContent="四柱推命エンジン ✓ · TOWA MAP ✓ · "+(h.database_ready?"保存 ✓":"保存確認中")}catch{}}
 function pillars(c){const p=c?.pillars||{};return '<div class="pillars">'+[["年柱",p.year],["月柱",p.month],["日柱",p.day],["時柱",p.hour]].map(([l,x])=>'<div class="p">'+l+'<b>'+(x?esc(x.stem+x.branch):"不明")+'</b></div>').join("")+'</div>'}
 
 function panel(line,label){
-  return '<div class="panel"><img class="art '+artClass(label)+'" src="'+ART+'" alt="TOWA"><div class="panelShade"></div><div class="bubble">「'+esc(line)+'」</div></div>';
+  return '<div class="panel"><img class="art '+artClass(label)+'" src="'+artFor(label)+'" alt="TOWA"><div class="panelShade"></div><div class="bubble">「'+esc(line)+'」</div></div>';
 }
 function story(s,key){
   const text=[s.towa_line].concat(s.paragraphs||[]).join(" ");
@@ -185,7 +201,7 @@ function pathSec(p){
   '<div class="note pathFooter">この順番の見方｜'+esc(p.note)+'</div></section>';
 }
 function letterSec(l){
-  return '<section class="story"><div class="storyTop"><div class="lab">'+esc(l.label)+'</div><h3 class="ttl">'+esc(l.title)+'</h3></div><div class="letter"><img class="art letterArt" src="'+ART+'" alt="TOWA"><div class="letterShade"></div><div class="letterContent"><h3>「'+esc(l.towa_line)+'」</h3>'+paraBlock(l.paragraphs,5)+'<div class="note">'+noteLabel("LETTER")+'｜'+esc(l.note)+'</div></div></div></section>';
+  return '<section class="story"><div class="storyTop"><div class="lab">'+esc(l.label)+'</div><h3 class="ttl">'+esc(l.title)+'</h3></div><div class="letter"><img class="art letterArt" src="'+TOWA_ART.letter+'" alt="TOWA"><div class="letterShade"></div><div class="letterContent"><h3>「'+esc(l.towa_line)+'」</h3>'+paraBlock(l.paragraphs,5)+'<div class="note">'+noteLabel("LETTER")+'｜'+esc(l.note)+'</div></div></div></section>';
 }
 function render(c,r){
   const root=$("#result");
