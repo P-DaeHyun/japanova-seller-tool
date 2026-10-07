@@ -205,6 +205,37 @@ pre{white-space:pre-wrap;font-size:11px}
 .offer button{border:0;background:#fff;color:var(--navy);padding:14px 24px;border-radius:999px;font-weight:800}
 .betaNotice{margin-top:8px;font-size:10px;color:rgba(255,255,255,.48)}
 
+.premiumStoryLead{max-width:760px;margin:28px 0 30px auto;font:500 18px/1.9 var(--serif);color:var(--navy)}
+.monthGrid{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line);border-left:1px solid var(--line)}
+.monthCard{min-height:170px;padding:22px 20px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);background:rgba(255,253,248,.48)}
+.monthCard .month{font:600 19px var(--serif);color:var(--navy)}
+.monthCard .monthMeta{margin:8px 0 12px;font-size:10px;letter-spacing:.08em;color:var(--gold)}
+.monthCard p{margin:0;font:400 12px/1.85 var(--serif);color:var(--muted)}
+.yearGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.yearCard{padding:28px 24px;border:1px solid var(--line);background:var(--ivory)}
+.yearCard .year{font:500 30px var(--serif);color:var(--navy)}
+.yearCard .theme{margin:8px 0 14px;font-size:11px;color:var(--gold);letter-spacing:.08em}
+.yearCard p{margin:0;font:400 13px/1.9 var(--serif);color:var(--muted)}
+.actionGrid{display:grid;grid-template-columns:1fr 1fr;gap:42px;margin-top:28px}
+.actionCol h4{font:600 18px var(--serif);color:var(--navy);margin:0 0 8px}
+.actionItem{padding:18px 0;border-top:1px solid var(--line)}
+.actionItem b{display:block;font:600 15px var(--serif);margin-bottom:7px}
+.actionItem p{margin:0;font-size:12px;line-height:1.85;color:var(--muted)}
+.balanceBox{margin-top:28px;padding:34px;background:var(--ivory);border:1px solid var(--line)}
+.balanceLead{font:500 20px/1.8 var(--serif);color:var(--navy);margin:0 0 26px}
+.balanceGrid{display:grid;grid-template-columns:1fr 1fr;gap:30px}
+.balanceLabel{font-size:10px;letter-spacing:.12em;color:var(--gold);font-weight:800;margin-bottom:10px}
+.swatches{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:24px}
+.swatch{display:flex;align-items:center;gap:8px;border:1px solid var(--line);padding:8px 10px;border-radius:999px;font-size:11px}
+.swatch i{display:block;width:18px;height:18px;border-radius:50%;border:1px solid rgba(0,0,0,.08)}
+.balanceText{font:400 13px/1.95 var(--serif);color:var(--muted);margin:0}
+.balanceNote{margin-top:28px;padding-top:18px;border-top:1px solid var(--line);font-size:11px;line-height:1.8;color:#7d766f}
+@media(max-width:820px){
+ .monthGrid{grid-template-columns:1fr 1fr}
+ .yearGrid,.actionGrid,.balanceGrid{grid-template-columns:1fr}
+ .actionGrid{gap:18px}
+ .balanceBox{padding:25px 20px}
+}
 .siteFooter{border-top:1px solid var(--line);margin-top:40px}
 .footerInner{max-width:1180px;margin:auto;padding:38px 30px 54px;display:flex;align-items:flex-start;justify-content:space-between;gap:30px}
 .footerBrand{font:700 20px var(--serif);letter-spacing:.15em;color:var(--navy)}
@@ -293,11 +324,11 @@ pre{white-space:pre-wrap;font-size:11px}
   </div>
   <div class="heroVisualWrap">
     <div class="heroFrame">
-      <img class="art heroArt" src="/assets/towa-warm.webp?v=0130" alt="TOWA">
+      <img class="art heroArt" src="/assets/towa-warm.webp?v=0140" alt="TOWA">
       <div class="heroShade"></div>
     </div>
     <div class="moonMark">☾</div>
-    <div class="betaTag">v0.13.1 · BETA</div>
+    <div class="betaTag">v0.14.0 · BETA</div>
     <div class="heroQuote">ずっと、あなたを知っていく。</div>
   </div>
 </section>
@@ -323,11 +354,11 @@ pre{white-space:pre-wrap;font-size:11px}
 <section id="free" class="featureSection">
   <div class="sectionKicker">FREE READING</div>
   <h2>まずは、ここまで一緒に見よう。</h2>
-  <p class="sectionLead">いきなりお金を払わなくて大丈夫。まずはTOWAがどんなふうにあなたを見るのか、無料で試してみて。変わりにくいあなたの核と、今の流れまで一緒に見ていくよ。</p>
+  <p class="sectionLead">いきなりお金を払わなくて大丈夫。まずはTOWAがどんなふうにあなたを見るのか、無料で試してみて。無料では「私はどんな人？」を、じっくり一緒に見ていくよ。</p>
   <div class="features">
-    <article class="feature"><div class="featureNo">01 / CORE</div><h3>あなたの核</h3><p>考え方、反応の仕方、自分らしさが戻りやすい状態を読み解く。</p></article>
-    <article class="feature"><div class="featureNo">02 / FLOW</div><h3>今のあなた</h3><p>最近の違和感や優先順位の変化を、大運の流れと重ねて整理する。</p></article>
-    <article class="feature"><div class="featureNo">03 / MAP</div><h3>命式の見える化</h3><p>年柱・月柱・日柱・時柱と、TOWAが見た読みの根拠を確認できる。</p></article>
+    <article class="feature"><div class="featureNo">01 / CORE</div><h3>あなたの核</h3><p>考え方や反応の仕方。変わりにくい「あなたらしさ」を一緒に見ていく。</p></article>
+    <article class="feature"><div class="featureNo">02 / STYLE</div><h3>考え方と伝え方</h3><p>どう答えを作るのか、どんなペースで気持ちを外へ出すのかを整理する。</p></article>
+    <article class="feature"><div class="featureNo">03 / ENERGY</div><h3>力が出る時、疲れやすい時</h3><p>得意な動き方と、無理を続けると消耗しやすいパターンを見つける。</p></article>
   </div>
 </section>
 
@@ -339,7 +370,7 @@ pre{white-space:pre-wrap;font-size:11px}
   <div class="steps">
     <div class="step"><div class="stepNo">01</div><h3>アカウントをつくる</h3><p>結果をあとから読み返せるように、無料アカウントを作成。</p></div>
     <div class="step"><div class="stepNo">02</div><h3>出生情報を入力</h3><p>暦を計算し、あなた専用の四柱推命の命式を作る。</p></div>
-    <div class="step"><div class="stepNo">03</div><h3>TOWAの話を聞いてみる</h3><p>まずは無料で、あなたの核と今の流れを話すね。もっと知りたくなった時だけ、その先を見てみよう。</p></div>
+    <div class="step"><div class="stepNo">03</div><h3>TOWAの話を聞いてみる</h3><p>まずは無料で、「私はどんな人？」を話すね。もっと知りたくなった時だけ、今の流れとこれからを一緒に見てみよう。</p></div>
   </div>
 </section>
 
@@ -396,13 +427,13 @@ pre{white-space:pre-wrap;font-size:11px}
 
 <script>
 const TOWA_ART={
-  hero:"/assets/towa-warm.webp?v=0130",
-  core:"/assets/towa-calm.webp?v=0130",
+  hero:"/assets/towa-warm.webp?v=0140",
+  core:"/assets/towa-calm.webp?v=0140",
   flow:null,
   path:null,
-  turning:"/assets/towa-calm.webp?v=0130",
-  next:"/assets/towa-warm.webp?v=0130",
-  letter:"/assets/towa-warm.webp?v=0130"
+  turning:"/assets/towa-calm.webp?v=0140",
+  next:"/assets/towa-warm.webp?v=0140",
+  letter:"/assets/towa-warm.webp?v=0140"
 };
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
@@ -462,26 +493,59 @@ function letterSec(l){
   return '<section class="story"><div class="storyTop"><div class="lab">'+esc(l.label)+'</div><h3 class="ttl">'+esc(l.title)+'</h3></div><div class="letter"><img class="art letterArt" src="'+TOWA_ART.letter+'" alt="TOWA"><div class="letterShade"></div><div class="letterContent"><h3>「'+esc(l.towa_line)+'」</h3>'+paraBlock(l.paragraphs,5)+'<div class="note">'+noteLabel("LETTER")+'｜'+esc(l.note)+'</div></div></div></section>';
 }
 function premiumGate(access){
-  return '<section class="paywall"><div class="paywallHead"><div class="lock">🔒</div><div class="eyebrow">TOWA COMPLETE</div><h3>ここからは、もう少し深く見てみようか。</h3><p class="muted">仕事や人間関係、恋愛、お金、転機、2027年の流れまで。気になるところから、もう少し一緒に見ていけるよ。</p></div>'+
+  return '<section class="paywall"><div class="paywallHead"><div class="lock">☾</div><div class="eyebrow">TOWA COMPLETE</div><h3>ここからは、今のあなたとこれからを一緒に見ようか。</h3><p class="muted">無料では「あなたはどんな人？」まで。完全鑑定では、今の流れ、仕事・恋愛・人間関係・お金、これからの時間まで続けて話すね。</p></div>'+
   '<div class="lockedGrid">'+
-  '<div class="lockedItem"><b>あなたの選び方</b><small>仕事・人間関係・恋愛・お金の優先順位</small></div>'+
-  '<div class="lockedItem"><b>流れが変わる時</b><small>大運から見る、基準を更新しやすい時期</small></div>'+
-  '<div class="lockedItem"><b>2027年のあなた</b><small>来年に意識しやすいテーマと準備</small></div>'+
-  '<div class="lockedItem"><b>TOWAからあなたへ</b><small>このMAPを最後にひとつに結ぶ手紙</small></div>'+
-  '</div><div class="offer"><div>2027年 完全鑑定</div><div class="price">¥'+Number(access?.price_jpy||1480).toLocaleString("ja-JP")+'</div><small>1回のみ · 自動更新なし</small><button id="purchaseBtn">もう少し深くみてもらう</button><div class="betaNotice">β版では決済準備中。今このボタンを押しても課金されません。</div></div></section>';
+  '<div class="lockedItem"><b>今のあなた</b><small>大運から見る、いま意識しやすいテーマ</small></div>'+
+  '<div class="lockedItem"><b>仕事・恋愛・人間関係・お金</b><small>あなたに合う選び方を4つのテーマで</small></div>'+
+  '<div class="lockedItem"><b>転機と2027年</b><small>流れが変わる時と、次の一年のテーマ</small></div>'+
+  '<div class="lockedItem"><b>2027年 12か月</b><small>月ごとに意識しやすいテーマを確認</small></div>'+
+  '<div class="lockedItem"><b>これから3年</b><small>少し先まで並べて、大きな流れを見る</small></div>'+
+  '<div class="lockedItem"><b>色・スタイル・行動ガイド</b><small>五行のバランスを日常に取り入れるヒント</small></div>'+
+  '</div><div class="offer"><div>TOWA 完全鑑定</div><div class="price">¥'+Number(access?.price_jpy||2980).toLocaleString("ja-JP")+'</div><small>1回のみ · 自動更新なし</small><button id="purchaseBtn">もう少し深くみてもらう</button><div class="betaNotice">β版では決済準備中。今このボタンを押しても課金されません。</div></div></section>';
 }
 function guideBox(premium){
-  const buttons=premium?'<button class="topic" data-topic="work">仕事</button><button class="topic" data-topic="money">お金</button><button class="topic" data-topic="love">恋愛</button><button class="topic" data-topic="people">人間関係</button><button class="topic" data-topic="now">今の流れ</button>':'<button class="topic" data-topic="now">今の流れ</button>';
-  return '<div class="guide"><h3>TOWAにもう少し聞いてみる</h3><p class="muted">'+(premium?'命式から選んだテーマを、もう少し深く読むよ。':'無料では「今の流れ」をもう少しだけ読めるよ。')+'</p>'+buttons+'<div id="guideResult"></div></div>';
+  if(!premium)return "";
+  const buttons='<button class="topic" data-topic="work">仕事</button><button class="topic" data-topic="money">お金</button><button class="topic" data-topic="love">恋愛</button><button class="topic" data-topic="people">人間関係</button><button class="topic" data-topic="now">今の流れ</button>';
+  return '<div class="guide"><h3>TOWAにもう少し聞いてみる</h3><p class="muted">気になるテーマがあったら、もう少し一緒に見てみよう。</p>'+buttons+'<div id="guideResult"></div></div>';
 }
+const SWATCH={
+ "深いグリーン":"#315843","青緑":"#3f7773","セージ":"#93a58d","生成り":"#efe8d8",
+ "コーラル":"#c97868","赤":"#9b3e46","やわらかい紫":"#8b7899","暖色のベージュ":"#c8ab8e",
+ "サンドベージュ":"#c7b394","黄土色":"#a98248","ブラウン":"#765747","アイボリー":"#eee8da",
+ "白":"#f7f7f4","シルバー":"#aaaeb2","ライトグレー":"#c8c9c6","淡いゴールド":"#c5a976",
+ "ネイビー":"#29334f","黒":"#2e2d31","深いブルー":"#36516f","透明感のあるグレー":"#b7bdc1"
+};
+function monthSec(x){
+ if(!x)return "";
+ return '<section class="story"><div class="storyTop"><div class="lab">'+esc(x.label)+'</div><h3 class="ttl">'+esc(x.title)+'</h3></div><div class="premiumStoryLead">「'+esc(x.towa_line)+'」</div><div class="monthGrid">'+
+ (x.months||[]).map(m=>'<div class="monthCard"><div class="month">'+esc(m.label)+'</div><div class="monthMeta">'+esc((m.pillar||"")+" · "+m.theme)+'</div><p>'+esc(m.text)+'</p></div>').join("")+
+ '</div><div class="note">'+esc(x.note)+'</div></section>';
+}
+function yearsSec(x){
+ if(!x)return "";
+ return '<section class="story"><div class="storyTop"><div class="lab">'+esc(x.label)+'</div><h3 class="ttl">'+esc(x.title)+'</h3></div><div class="premiumStoryLead">「'+esc(x.towa_line)+'」</div><div class="yearGrid">'+
+ (x.years||[]).map(y=>'<div class="yearCard"><div class="year">'+esc(y.year)+'</div><div class="theme">'+esc(y.pillar+" · "+y.theme)+'</div><p>'+esc(y.text)+'</p></div>').join("")+
+ '</div><div class="note">'+esc(x.note)+'</div></section>';
+}
+function actionSec(x){
+ if(!x)return "";
+ const col=(title,arr)=>'<div class="actionCol"><h4>'+title+'</h4>'+(arr||[]).map(a=>'<div class="actionItem"><b>'+esc(a.title)+'</b><p>'+esc(a.text)+'</p></div>').join("")+'</div>';
+ return '<section class="story"><div class="storyTop"><div class="lab">ACTION</div><h3 class="ttl">今のあなたに、3つずつ</h3></div><div class="premiumStoryLead">「'+esc(x.towa_line)+'」</div><div class="actionGrid">'+col("増やしてみること",x.add)+col("少し減らしてみること",x.reduce)+'</div></section>';
+}
+function balanceSec(x){
+ if(!x)return "";
+ const chips=(x.colors||[]).concat(x.sub_color?[x.sub_color]:[]).map(v=>'<span class="swatch"><i style="background:'+(SWATCH[v]||"#ddd")+'"></i>'+esc(v)+'</span>').join("");
+ return '<section class="story"><div class="storyTop"><div class="lab">'+esc(x.label)+'</div><h3 class="ttl">'+esc(x.title)+'</h3></div><div class="balanceBox"><p class="balanceLead">「'+esc(x.towa_line)+'」</p><div class="balanceGrid"><div><div class="balanceLabel">COLOR</div><div class="swatches">'+chips+'</div><div class="balanceLabel">MATERIAL / MOOD</div><p class="balanceText">'+esc((x.materials||[]).join(" · "))+'</p></div><div><div class="balanceLabel">HOW TO USE</div><p class="balanceText">'+esc(x.way)+'</p><div class="balanceLabel" style="margin-top:20px">FIVE ELEMENTS</div><p class="balanceText">補いたい要素：'+esc(x.element)+'　／　強く出やすい要素：'+esc(x.dominant)+'</p></div></div><div class="balanceNote">'+esc(x.note)+'</div></div></section>';
+}
+
 function render(c,r,access={}){
   const root=$("#result"),premium=Boolean(access.premium);
   let html='<div class="mapCover"><div class="mapHead"><div class="eyebrow">FROM TOWA</div><div class="mapTitle">うん、少し見えてきたよ。</div><p class="muted">'+esc(r.opening)+'</p>'+(access.preview?'<span class="previewBadge">β PREMIUM PREVIEW</span>':'')+'</div></div>'+
   pillars(c)+
   '<div class="profiles">'+(r.profile_cards||[]).map(x=>'<div class="prof"><span>'+esc(x.label)+'</span><strong>'+esc(x.value)+'</strong><small>'+esc(x.note)+'</small></div>').join("")+'</div>'+
-  story(r.core,"CORE")+story(r.flow,"FLOW");
+  story(r.core,"CORE");
   if(premium){
-    html+=pathSec(r.path)+story(r.turning_point,"TURNING")+story(r.next,"NEXT")+letterSec(r.letter);
+    html+=story(r.flow,"FLOW")+pathSec(r.path)+story(r.turning_point,"TURNING")+story(r.next,"NEXT")+monthSec(r.year_calendar)+yearsSec(r.three_years)+actionSec(r.action_guide)+balanceSec(r.balance_style)+letterSec(r.letter);
   }else{
     html+=premiumGate(access);
   }
@@ -489,7 +553,7 @@ function render(c,r,access={}){
   root.innerHTML=html;
   root.classList.remove("hidden");
   root.querySelectorAll("[data-topic]").forEach(b=>b.onclick=()=>guide(b.dataset.topic));
-  const buy=$("#purchaseBtn");if(buy)buy.onclick=()=>{buy.textContent="決済は次の工程で接続するよ";buy.disabled=true;};
+  const buy=$("#purchaseBtn");if(buy)buy.onclick=()=>{buy.textContent="購入のお申込みは次の工程でつなぐね";buy.disabled=true;};
 }
 async function guide(t){
   const x=$("#guideResult");x.textContent="読み直してる…";
