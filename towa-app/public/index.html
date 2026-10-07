@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TOWA v0.11.6</title>
+<title>TOWA v0.11.7</title>
 <style>
 :root{--ink:#20212b;--navy:#292c4b;--paper:#fffdfa;--line:#e7ded3;--muted:#766f73;--gold:#b68035;--cream:#f7f1e8}
 *{box-sizing:border-box}
@@ -47,13 +47,39 @@ button{border:0;border-radius:14px;padding:13px 17px;background:var(--navy);colo
 .lab{font:800 12px Georgia,serif;letter-spacing:.14em;color:var(--gold)}
 .ttl{font:29px Georgia,"Yu Mincho",serif;margin:0}
 .panel{min-height:270px;margin:17px 0;border-radius:24px;position:relative;overflow:hidden;background:#252743}
-.panelShade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(25,29,56,.08),rgba(25,29,56,.78) 53%,rgba(25,29,56,.96));z-index:1}
-.bubble{position:absolute;z-index:2;right:26px;top:50%;transform:translateY(-50%);width:52%;font:20px/1.7 Georgia,"Yu Mincho",serif;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.18)}
-.art-core{object-position:46% 28%}
-.art-flow{object-position:58% 22%}
-.art-path{object-position:42% 30%}
-.art-turning{object-position:62% 24%}
-.art-next{object-position:54% 18%}
+.panelShade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(25,29,56,.08),rgba(25,29,56,.74) 54%,rgba(25,29,56,.95));z-index:1}
+.bubble{position:absolute;z-index:3;right:26px;top:50%;transform:translateY(-50%);width:52%;font:20px/1.7 Georgia,"Yu Mincho",serif;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.18)}
+.panel-core .art{filter:saturate(1.04) brightness(1.08)}
+.panel-core .panelShade{background:linear-gradient(90deg,rgba(25,29,56,.02),rgba(25,29,56,.64) 58%,rgba(25,29,56,.92))}
+.art-core{object-position:50% 24%}
+
+.abstract-flow{background:
+radial-gradient(circle at 18% 28%,rgba(216,181,116,.18) 0 2px,transparent 3px),
+radial-gradient(circle at 74% 22%,rgba(255,255,255,.10) 0 2px,transparent 3px),
+radial-gradient(circle at 42% 72%,rgba(255,255,255,.07) 0 1px,transparent 2px),
+linear-gradient(125deg,#202440 0%,#343955 52%,#242841 100%)}
+.abstract-flow:before{content:"";position:absolute;width:310px;height:310px;border:1px solid rgba(221,190,130,.22);border-radius:50%;left:-95px;top:-125px;box-shadow:0 0 0 36px rgba(221,190,130,.035),0 0 0 76px rgba(221,190,130,.02)}
+.abstract-flow:after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 0 28%,rgba(255,255,255,.045) 28.5% 29%,transparent 29.5% 100%)}
+.abstract-flow .panelShade{background:linear-gradient(90deg,rgba(18,22,42,.15),rgba(25,29,56,.42) 47%,rgba(25,29,56,.78))}
+
+.abstract-path{background:
+linear-gradient(35deg,transparent 0 47%,rgba(205,166,103,.12) 47.4% 47.8%,transparent 48.2% 100%),
+linear-gradient(145deg,transparent 0 58%,rgba(255,255,255,.055) 58.4% 58.8%,transparent 59.2% 100%),
+radial-gradient(circle at 23% 50%,rgba(205,166,103,.10),transparent 27%),
+linear-gradient(120deg,#222641,#2e334f 56%,#20243d)}
+.abstract-path:before{content:"";position:absolute;width:250px;height:250px;border:1px solid rgba(205,166,103,.24);border-radius:50%;left:42px;top:10px}
+.abstract-path:after{content:"";position:absolute;width:150px;height:150px;border:1px solid rgba(255,255,255,.07);border-radius:50%;left:92px;top:60px}
+.abstract-path .panelShade{background:linear-gradient(90deg,rgba(17,20,38,.24),rgba(27,31,55,.38) 45%,rgba(27,31,55,.82))}
+
+.panel-turning .art{filter:saturate(.92) brightness(.92)}
+.art-turning{object-position:78% 24%}
+.panel-turning .panelShade{background:linear-gradient(90deg,rgba(25,29,56,.94) 0%,rgba(25,29,56,.72) 43%,rgba(25,29,56,.18) 100%)}
+.panel-turning .bubble{left:30px;right:auto;width:48%}
+
+.panel-next .art{filter:saturate(1.06) brightness(1.16)}
+.art-next{object-position:55% 18%}
+.panel-next .panelShade{background:linear-gradient(90deg,rgba(24,28,51,.12),rgba(24,28,51,.34) 52%,rgba(24,28,51,.56))}
+.panel-next .bubble{background:rgba(31,35,65,.64);backdrop-filter:blur(8px);padding:15px 18px;border-radius:16px;width:48%;right:24px;text-shadow:none}
 .prose,.topicBlock{background:#fff;border:1px solid var(--line);border-radius:20px;padding:21px}
 .prose p,.topicBlock p{line-height:1.95;margin:0 0 15px}
 .leadSentence{font-weight:800;color:#191b2e}
@@ -93,7 +119,10 @@ pre{white-space:pre-wrap;font-size:12px}
 .panel{min-height:340px}
 .panelShade{background:linear-gradient(180deg,rgba(25,29,56,.05),rgba(25,29,56,.80) 55%,rgba(25,29,56,.98))}
 .art{object-position:center top}
-.bubble{left:22px;right:22px;top:auto;bottom:24px;transform:none;width:auto}
+.panel-turning .art,.panel-next .art{object-position:center top}
+.bubble,.panel-turning .bubble,.panel-next .bubble{left:22px;right:22px;top:auto;bottom:24px;transform:none;width:auto}
+.panel-turning .panelShade{background:linear-gradient(180deg,rgba(25,29,56,.05),rgba(25,29,56,.78) 55%,rgba(25,29,56,.98))}
+.panel-next .panelShade{background:linear-gradient(180deg,rgba(25,29,56,.02),rgba(25,29,56,.50) 54%,rgba(25,29,56,.82))}
 .ttl{font-size:25px}
 .prose,.topicBlock{padding:18px}
 }
@@ -104,13 +133,13 @@ pre{white-space:pre-wrap;font-size:12px}
 <section class="card hero">
   <div class="copy">
     <div class="logo">T☾WA<small>データで読み解く四柱推命</small></div>
-    <span class="beta">v0.11.6 · TOWA MAP</span>
+    <span class="beta">v0.11.7 · TOWA MAP</span>
     <h1>あなたという人の<br>地図をひらく。</h1>
     <p class="muted">生まれた日の暦を計算し、変わりにくいあなたの核と、今動いている流れを重ねて読む。未来を決めつけるためじゃなく、自分の選び方を知るための四柱推命だよ。</p>
     <div id="infra" class="status">接続状態を確認中…</div>
   </div>
   <div class="visual">
-    <img class="art heroArt" src="/assets/towa-warm.webp?v=0116" alt="TOWA">
+    <img class="art heroArt" src="/assets/towa-warm.webp?v=0117" alt="TOWA">
     <div class="heroShade"></div>
     <div class="heroPill">ずっと、あなたを知っていく。</div>
   </div>
@@ -145,13 +174,13 @@ pre{white-space:pre-wrap;font-size:12px}
 
 <script>
 const TOWA_ART={
-  hero:"/assets/towa-warm.webp?v=0116",
-  core:"/assets/towa-calm.webp?v=0116",
-  flow:"/assets/towa-calm.webp?v=0116",
-  path:"/assets/towa-calm.webp?v=0116",
-  turning:"/assets/towa-calm.webp?v=0116",
-  next:"/assets/towa-warm.webp?v=0116",
-  letter:"/assets/towa-warm.webp?v=0116"
+  hero:"/assets/towa-warm.webp?v=0117",
+  core:"/assets/towa-calm.webp?v=0117",
+  flow:null,
+  path:null,
+  turning:"/assets/towa-calm.webp?v=0117",
+  next:"/assets/towa-warm.webp?v=0117",
+  letter:"/assets/towa-warm.webp?v=0117"
 };
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
@@ -174,21 +203,27 @@ function paraBlock(ps,limit){ps=ps||[];const first=ps.slice(0,limit),rest=ps.sli
 function scene(key){const s=SCENE[key];return s?'<div class="scene"><b>こんな時に出やすい</b>'+esc(s)+'</div>':""}
 function noteLabel(key){return({CORE:"TOWA KEY",FLOW:"覚えておいて",TURNING:"TOWA KEY",NEXT:"今できること",LETTER:"TOWA NOTE",work:"今のヒント",money:"今のヒント",love:"今のヒント",people:"今のヒント"}[key]||"TOWA NOTE")}
 function termHints(text){const xs=Object.keys(TERM).filter(k=>String(text||"").includes(k));return xs.length?'<div class="terms">'+xs.map(k=>'<span class="term"><b>'+k+'</b><small>'+esc(TERM[k])+'</small></span>').join("")+'</div>':""}
-function artClass(label){return label==="CORE"?"art-core":label==="FLOW"?"art-flow":label==="PATH"?"art-path":label==="TURNING POINT"?"art-turning":label==="NEXT"?"art-next":"art-core"}
+function panelKey(label){
+  if(label==="CORE")return "core";
+  if(label==="FLOW")return "flow";
+  if(label==="PATH")return "path";
+  if(label==="TURNING POINT")return "turning";
+  if(label==="NEXT")return "next";
+  return "core";
+}
 function artFor(label){
-  if(label==="CORE")return TOWA_ART.core;
-  if(label==="FLOW")return TOWA_ART.flow;
-  if(label==="PATH")return TOWA_ART.path;
-  if(label==="TURNING POINT")return TOWA_ART.turning;
-  if(label==="NEXT")return TOWA_ART.next;
-  return TOWA_ART.calm;
+  const key=panelKey(label);
+  return TOWA_ART[key]||null;
 }
 
 async function health(){try{const h=await api("/api/health");$("#infra").textContent="四柱推命エンジン ✓ · TOWA MAP ✓ · "+(h.database_ready?"保存 ✓":"保存確認中")}catch{}}
 function pillars(c){const p=c?.pillars||{};return '<div class="pillars">'+[["年柱",p.year],["月柱",p.month],["日柱",p.day],["時柱",p.hour]].map(([l,x])=>'<div class="p">'+l+'<b>'+(x?esc(x.stem+x.branch):"不明")+'</b></div>').join("")+'</div>'}
 
 function panel(line,label){
-  return '<div class="panel"><img class="art '+artClass(label)+'" src="'+artFor(label)+'" alt="TOWA"><div class="panelShade"></div><div class="bubble">「'+esc(line)+'」</div></div>';
+  const key=panelKey(label),src=artFor(label);
+  const cls='panel panel-'+key+(key==="flow"||key==="path"?' abstract-'+key:'');
+  const image=src?'<img class="art art-'+key+'" src="'+src+'" alt="TOWA">':'';
+  return '<div class="'+cls+'">'+image+'<div class="panelShade"></div><div class="bubble">「'+esc(line)+'」</div></div>';
 }
 function story(s,key){
   const text=[s.towa_line].concat(s.paragraphs||[]).join(" ");
