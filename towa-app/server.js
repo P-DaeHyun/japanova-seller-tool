@@ -149,16 +149,23 @@ function stats(c){
 function currentDY(c){
  const y=new Date().getFullYear();return(c.daYun&&c.daYun.cycles||[]).find(x=>y>=x.startYear&&y<=x.endYear)||null;
 }
-function level(n){return n>=10?"とても強い":n>=7?"強い":n>=4?"しっかり":n>=2?"ほどよい":"静か"}
+function profilePhrase(kind,n){
+ if(kind==="thought")return n>=10?"深く考えてから決める":n>=7?"整理してから動く":n>=4?"考えながら整える":"まず動いて確かめる";
+ if(kind==="expression")return n>=7?"言葉や形にして伝える":n>=4?"必要な時に伝える":"内側で熟成してから伝える";
+ if(kind==="responsibility")return n>=7?"任されると最後まで背負う":n>=4?"必要な分だけ引き受ける":"自分のペースを守る";
+ if(kind==="learning")return n>=7?"経験をすぐ次に生かす":n>=4?"経験を自分なりに整える":"時間をかけて腑に落とす";
+ return"自分のペースで整える";
+}
 function cards(c,s,dy){
  const out=(s.g["食神"]||0)+(s.g["傷官"]||0),auth=(s.g["正官"]||0)+(s.g["七殺"]||0),res=(s.g["正印"]||0)+(s.g["偏印"]||0);
- const trans=dy&&Math.abs(new Date().getFullYear()-dy.startYear)<=1?"切り替わり期":dy?"積み上げ期":"確認中";
+ const thought=(s.e.water||0)+Math.round((s.e.metal||0)/2);
+ const trans=dy&&Math.abs(new Date().getFullYear()-dy.startYear)<=1?"基準が切り替わる時":dy?"積み上げを選び直す時":"今の流れを確認中";
  return[
-  {label:"考える深さ",value:level((s.e.water||0)+Math.round((s.e.metal||0)/2)),note:"情報を内側で整理する力"},
-  {label:"表現の力",value:level(out),note:"考えを言葉や形にする力"},
-  {label:"責任感",value:level(auth),note:"役割を引き受ける力"},
-  {label:"学びの力",value:level(res),note:"経験から整える力"},
-  {label:"今の流れ",value:trans,note:dy?dy.ganZhi+"大運":"大運確認中"}
+  {label:"考え方",value:profilePhrase("thought",thought),note:"情報を受け取って答えを作る"},
+  {label:"伝え方",value:profilePhrase("expression",out),note:"考えを外へ出すペース"},
+  {label:"責任との距離",value:profilePhrase("responsibility",auth),note:"役割をどこまで持つか"},
+  {label:"学び方",value:profilePhrase("learning",res),note:"経験を次に変える方法"},
+  {label:"今の流れ",value:trans,note:dy?dy.ganZhi+"大運":"大運を確認中"}
  ];
 }
 function scores(s,c){
@@ -227,7 +234,7 @@ function reading(c,name){
   :"命式全体を見ると、急いで自分を変えるより、自分に合う環境やペースを選ぶことで本来の良さが出やすい。";
  const openingName=name&&name.length<=12&&!/@/.test(name)?name+"さん、":"";
  return{
-  engine:"towa-rules-v0.10",
+  engine:"towa-rules-v0.11",
   opening:openingName+"生まれた日の暦から、変わりにくいあなたの核と、今まさに動いている流れを重ねてみたよ。これは『未来を決めつける答え』ではなく、あなたが自分の選び方を理解するための地図。読みながら、妙にしっくりくるところだけ大事にしてね。",
   profile_cards:cards(c,s,dy),
   core:{
@@ -340,8 +347,8 @@ async function makeReading(req,res){
   await pool.query("INSERT INTO birth_profiles(user_id,gender,birth_date,birth_time,birth_time_known) VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id) DO UPDATE SET gender=EXCLUDED.gender,birth_date=EXCLUDED.birth_date,birth_time=EXCLUDED.birth_time,birth_time_known=EXCLUDED.birth_time_known,updated_at=NOW()",[u.id,p.gender,p.birth_date,p.birth_time_known?p.birth_time:null,Boolean(p.birth_time_known)]);
   await pool.query("INSERT INTO saju_profiles(user_id,engine_version,chart_json) VALUES($1,$2,$3) ON CONFLICT(user_id) DO UPDATE SET engine_version=EXCLUDED.engine_version,chart_json=EXCLUDED.chart_json,calculated_at=NOW()",[u.id,"@openfate/bazi-engine@2.0.0",JSON.stringify(c)]);
   const r=reading(c,u.display_name);
-  await pool.query("INSERT INTO reading_reports(id,user_id,report_json,model_name) VALUES($1,$2,$3,$4)",[randomUUID(),u.id,JSON.stringify(r),"towa-rules-v0.10"]);
-  json(res,200,{chart:c,reading:r,engine:"towa-rules-v0.10",api_cost_jpy:0});
+  await pool.query("INSERT INTO reading_reports(id,user_id,report_json,model_name) VALUES($1,$2,$3,$4)",[randomUUID(),u.id,JSON.stringify(r),"towa-rules-v0.11"]);
+  json(res,200,{chart:c,reading:r,engine:"towa-rules-v0.11",api_cost_jpy:0});
  }catch(e){json(res,500,{error:e.message})}
 }
 async function guide(req,res){
@@ -349,7 +356,7 @@ async function guide(req,res){
  const b=await body(req),sp=await one("SELECT chart_json FROM saju_profiles WHERE user_id=$1",[u.id]);
  if(!sp)return json(res,400,{error:"先にTOWA MAPを作ってね。"});
  const allowed=["work","money","love","people","now"],k=allowed.includes(b.topic)?b.topic:"now";
- json(res,200,{topic:k,answer:guidance(sp.chart_json,k),engine:"towa-rules-v0.10",api_cost_jpy:0});
+ json(res,200,{topic:k,answer:guidance(sp.chart_json,k),engine:"towa-rules-v0.11",api_cost_jpy:0});
 }
 function staticFile(req,res){
  let p=new URL(req.url,"http://x").pathname;if(p==="/")p="/index.html";
@@ -359,7 +366,7 @@ function staticFile(req,res){
 }
 const server=http.createServer(async(req,res)=>{
  const p=new URL(req.url,"http://x").pathname;
- if(req.method==="GET"&&p==="/api/health")return json(res,200,{ok:true,version:"0.10",database_ready:dbReady,database_error:dbError,interpretation_engine:"towa-rules-v0.10",openai_required:false,api_cost_jpy:0,target_year:TARGET_YEAR});
+ if(req.method==="GET"&&p==="/api/health")return json(res,200,{ok:true,version:"0.11",database_ready:dbReady,database_error:dbError,interpretation_engine:"towa-rules-v0.11",openai_required:false,api_cost_jpy:0,target_year:TARGET_YEAR});
  if(req.method==="POST"&&p==="/api/auth/register")return dbReady?register(req,res):json(res,503,{error:"DB接続待ち"});
  if(req.method==="POST"&&p==="/api/auth/login")return dbReady?login(req,res):json(res,503,{error:"DB接続待ち"});
  if(req.method==="GET"&&p==="/api/me")return me(req,res);
@@ -368,4 +375,4 @@ const server=http.createServer(async(req,res)=>{
  if(req.method==="GET")return staticFile(req,res);
  res.writeHead(405);res.end();
 });
-server.listen(PORT,()=>console.log("TOWA v0.10 listening on "+PORT+" dbReady="+dbReady+" rulesEngine=true apiCost=0"));
+server.listen(PORT,()=>console.log("TOWA v0.11 listening on "+PORT+" dbReady="+dbReady+" rulesEngine=true apiCost=0"));
