@@ -248,7 +248,7 @@ function reading(c,name){
  const openingName=name&&name.length<=12&&!/@/.test(name)?name+"さん、":"";
  return{
   engine:"towa-rules-v0.11",
-  opening:openingName+"生まれた日の暦から、変わりにくいあなたの核と、今まさに動いている流れを重ねてみたよ。これは『未来を決めつける答え』ではなく、あなたが自分の選び方を理解するための地図。読みながら、妙にしっくりくるところだけ大事にしてね。",
+  opening:openingName+"生まれた日の暦から、変わりにくいあなたの核と、今まさに動いている流れを重ねてみたよ。これは『未来を決めつける答え』じゃないよ。あなたが自分の選び方を少し理解するための手がかり。読んでいて、妙にしっくりくるところだけ大事にしてね。",
   profile_cards:cards(c,s,dy),
   core:{
    label:"CORE",title:"あなたの核",
