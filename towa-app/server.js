@@ -13,7 +13,7 @@ const DATABASE_URL=process.env.DATABASE_URL||"";
 const COOKIE_SECURE=process.env.COOKIE_SECURE==="true";
 const TARGET_YEAR=Number(process.env.TOWA_TARGET_YEAR||2027);
 const PRODUCT_CODE="towa_2027_complete";
-const TOWA_PRICE_JPY=Number(process.env.TOWA_PRICE_JPY||1480);
+const TOWA_PRICE_JPY=Number(process.env.TOWA_PRICE_JPY||2980);
 const BETA_PREMIUM_PREVIEW=process.env.TOWA_BETA_PREMIUM_PREVIEW==="true";
 const publicDir=path.join(__dirname,"public");
 const schema=fs.readFileSync(path.join(__dirname,"schema.sql"),"utf8");
@@ -49,8 +49,14 @@ async function accessFor(req,userId){
   return {premium:entitled||preview,entitled,preview,product_code:PRODUCT_CODE,price_jpy:TOWA_PRICE_JPY,billing:"one_time",auto_renew:false,payment_ready:false};
 }
 function publicReading(r,access){
-  if(!r||access.premium)return r;
-  return {opening:r.opening,profile_cards:r.profile_cards,core:r.core,flow:r.flow,evidence:r.evidence};
+ if(!r||access.premium)return r;
+ const ev=r.evidence||{};
+ return {
+  opening:r.opening,
+  profile_cards:(r.profile_cards||[]).slice(0,4),
+  core:r.core,
+  evidence:{day_master:ev.day_master,dominant_element:ev.dominant_element,weak_element:ev.weak_element,interactions:ev.interactions||[]}
+ };
 }
 function makeChart(p){
   const a=p.birth_date.split("-").map(Number);
@@ -138,6 +144,70 @@ const FLOW={
  "偏印":"今までと違う考え方や学びが入りやすい流れ。昔は興味がなかったことが急に気になったり、これまでの常識を疑いたくなったりする。結論を急がず、試してから残すものを選ぶといい。",
  "正印":"学び直し、準備、知識、人からの助けが力になりやすい流れ。すぐに成果に変わらなくても、今身につけたものがあとで土台になる。ひとりで全部解決しようとせず、頼れる場所を持つことも実力のひとつ。"
 };
+
+const MONTH_HINT={
+ "比肩":"自分のペースを取り戻す月。人に合わせすぎず、自分で決める余白を残してね。",
+ "劫財":"人とのやり取りが増えやすい月。競うより、対等に組める相手を選ぶと整いやすいよ。",
+ "食神":"少し力を抜くほど良さが出る月。楽しさや余白を予定に入れてみて。",
+ "傷官":"違和感に気づきやすい月。すぐ壊すより、まず言葉にして整理すると力になるよ。",
+ "偏財":"人・情報・お金が動きやすい月。全部拾わず、誰と何に時間を使うかを選んで。",
+ "正財":"暮らしとお金を整える月。固定費や予定を見直すと安心が増えやすいよ。",
+ "七殺":"忙しさや責任が増えやすい月。頑張れることと、背負うべきことを分けてね。",
+ "正官":"役割や信用を意識しやすい月。きちんとするほど、自分の余白も一緒に守って。",
+ "偏印":"新しい考え方に惹かれやすい月。結論を急がず、まず小さく試してみて。",
+ "正印":"学びや助けを受け取りやすい月。ひとりで抱えず、頼れるものを使っていいよ。"
+};
+const ELEMENT_STYLE={
+ wood:{colors:["深いグリーン","青緑","セージ"],sub:"生成り",materials:["木","リネン","植物"],way:"服を全部変えなくていいよ。ハンカチ、スマホ背景、デスクの小物みたいな小さい面積から緑を足してみて。",sense:"伸びる余白を作る"},
+ fire:{colors:["コーラル","赤","やわらかい紫"],sub:"暖色のベージュ",materials:["暖色の光","柔らかな布","あたたかい質感"],way:"強い赤を無理に着なくても大丈夫。小物や照明など『少し温度を感じる色』から取り入れてみて。",sense:"気持ちを外へ動かす"},
+ earth:{colors:["サンドベージュ","黄土色","ブラウン"],sub:"アイボリー",materials:["陶器","石","コットン"],way:"毎日触るものに落ち着いた土色をひとつ置いてみて。バッグや財布、マグカップくらいで十分だよ。",sense:"足元を整える"},
+ metal:{colors:["白","シルバー","ライトグレー"],sub:"淡いゴールド",materials:["金属","ガラス","すっきりした直線"],way:"アクセサリーや時計、スマホケースみたいな小物に白やシルバーを足すと取り入れやすいよ。",sense:"境界線をはっきりさせる"},
+ water:{colors:["ネイビー","黒","深いブルー"],sub:"透明感のあるグレー",materials:["ガラス","水のモチーフ","落ち着いた光沢"],way:"黒一色にする必要はないよ。ネイビーの小物や背景、透明なガラス素材を少し置くくらいからで十分。",sense:"立ち止まって考える余白を作る"}
+};
+
+function monthGuide(dayMaster,year){
+ const names=["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
+ return names.map((label,i)=>{
+  let p=null;
+  try{
+   const x=calculateBaziChart({year,month:i+1,day:15,hour:12,minute:0,gender:"male",calendarType:"solar",timezoneId:"Asia/Tokyo",enableTrueSolarTime:false,dayBoundaryMode:"MIDNIGHT_00",daYunTimingVersion:"DAYUN_SECOND_V2"});
+   p=x?.pillars?.month||null;
+  }catch{}
+  const god=p?tenGod(dayMaster,p.stem):"";
+  return{month:i+1,label,pillar:p?p.stem+p.branch:null,theme:god||"整える",text:MONTH_HINT[god]||"予定を詰めすぎず、今の自分に合うペースを確かめる月として使ってみて。"};
+ });
+}
+function threeYearGuide(dayMaster){
+ return [TARGET_YEAR,TARGET_YEAR+1,TARGET_YEAR+2].map(y=>{
+  const gz=yearGZ(y),sg=tenGod(dayMaster,gz.stem),bg=tenGod(dayMaster,MAIN[gz.branch]);
+  return{year:y,pillar:gz.stem+gz.branch,theme:sg+" × "+bg,text:(MONTH_HINT[sg]||"自分の基準を整える流れ。")+" 1年を決めつける予言ではなく、意識に上がりやすいテーマとして見てね。"};
+ });
+}
+function actionGuide(s,c,dy){
+ const weak=s.weak?.[0]||"earth",dom=s.dom?.[0]||"water",style=ELEMENT_STYLE[weak]||ELEMENT_STYLE.earth;
+ return{
+  towa_line:"じゃあ、今のあなたが意識するとよさそうなことを、3つずつに絞るね。",
+  add:[
+   {title:"自分の基準を3つ書く",text:"仕事でも人間関係でも、『これだけは守りたい』を3つだけ言葉にしてみて。迷った時の戻り場所になるよ。"},
+   {title:EJ[weak]+"の感覚を少し足す",text:"命式では"+EJ[weak]+"が相対的に控えめ。日常では「"+style.sense+"」ことを意識すると、いつもの得意なやり方に別の視点を足しやすいよ。"},
+   {title:"小さく試してから決める",text:dy?"今は"+dy.ganZhi+"大運の途中。大きく決める前に、1週間・1か月だけ試せる形を作ってみて。":"大きな答えを一度に出さず、まず小さく試してから残すものを選んでみて。"}
+  ],
+  reduce:[
+   {title:"全部にすぐ答えること",text:"返事を急がなくていい場面では、一度持ち帰って考える時間を作って。"},
+   {title:"違和感を小さいまま飲み込むこと",text:(c.interactions||[]).length?"命式には組み替える力も見えるよ。小さな違和感のうちに、距離や役割を調整してみて。":"『まあいいか』が続く時ほど、一度自分の本音を確認してみて。"},
+   {title:EJ[dom]+"のやり方だけで押し切ること",text:"得意な力は大切。でも強い要素だけで全部を解こうとすると疲れやすい。別のやり方をひとつ混ぜてみて。"}
+  ]
+ };
+}
+function balanceStyle(s){
+ const weak=s.weak?.[0]||"earth",dom=s.dom?.[0]||"water",x=ELEMENT_STYLE[weak]||ELEMENT_STYLE.earth;
+ return{
+  label:"BALANCE",title:"あなたを整える色とスタイル",element:EJ[weak],dominant:EJ[dom],
+  towa_line:"命式のバランスを見ると、"+EJ[weak]+"を象徴する色や質感を少し足してあげるのが似合いそう。",
+  colors:x.colors,sub_color:x.sub,materials:x.materials,way:x.way,
+  note:"これは『この色を持てば必ず運が上がる』という意味じゃないよ。五行のバランスを日常で意識するための、小さな合図として使ってみて。"
+ };
+}
 
 function tenGod(day,other){
  const a=STEM[day],b=STEM[other];if(!a||!b)return"";
@@ -241,14 +311,15 @@ function reading(c,name){
  const s=stats(c),dy=currentDY(c),dm=c.dayMaster?.char||c.pillars?.day?.stem,base=CORE[dm]||["自分の内側に基準を持つ人。","納得してから進む方が力を出しやすい。","自分のペースを守ることが大切。"];
  const interactions=c.interactions||[],ny=yearGZ(TARGET_YEAR),sg=tenGod(dm,ny.stem),bg=tenGod(dm,MAIN[ny.branch]);
  const topics=scores(s,c).map(x=>topic(x,s,c,dy)),next=(c.daYun?.cycles||[]).find(x=>dy&&x.startYear>dy.startYear);
+ const months=monthGuide(dm,TARGET_YEAR),years=threeYearGuide(dm),actions=actionGuide(s,c,dy),style=balanceStyle(s);
  const nowYear=new Date().getFullYear(),isShift=dy&&Math.abs(nowYear-dy.startYear)<=1;
  const interactionCopy=interactions.length
   ?"命式の中には、ものごとを一度そのまま受け入れて終わりにするより、『本当にこの形でいいのか』と考え直す動きもある。だから人生の節目では、周りがまだ続けられると思っている時でも、自分の中では先に次の形を考え始めていることがある。これは不安定さではなく、違和感を放置せず組み替える力として使える。"
   :"命式全体を見ると、急いで自分を変えるより、自分に合う環境やペースを選ぶことで本来の良さが出やすい。";
  const openingName=name&&name.length<=12&&!/@/.test(name)?name+"さん、":"";
  return{
-  engine:"towa-rules-v0.11",
-  opening:openingName+"生まれた日の暦から、変わりにくいあなたの核と、今まさに動いている流れを重ねてみたよ。これは『未来を決めつける答え』じゃないよ。あなたが自分の選び方を少し理解するための手がかり。読んでいて、妙にしっくりくるところだけ大事にしてね。",
+  engine:"towa-rules-v0.14",
+  opening:openingName+"生まれた日の暦から、まずは変わりにくいあなたの部分を見てみたよ。これは『あなたは絶対こういう人』と決めつける答えじゃないよ。読んでいて、妙にしっくりくるところだけ大事にしてね。",
   profile_cards:cards(c,s,dy),
   core:{
    label:"CORE",title:"あなたの核",
@@ -306,6 +377,20 @@ function reading(c,name){
    ],
    note:TARGET_YEAR+"年の目標を10個作るより、『これだけは育てたい』をひとつ決める方が、あなたには合っているかもしれない。"
   },
+  year_calendar:{
+   label:"12 MONTHS",title:TARGET_YEAR+"年、12か月の流れ",
+   towa_line:"一年をひとまとめにせず、月ごとに少しずつ見てみよう。予定を決める答えじゃなく、立ち止まるタイミングを作るために使ってね。",
+   months,
+   note:"月運は節入りで切り替わるため、ここでは各月の中頃を基準にした目安として見ているよ。"
+  },
+  three_years:{
+   label:"3 YEARS",title:"これから3年の大きな流れ",
+   towa_line:"来年だけじゃなく、少し先まで並べると『今すぐ決めなくていいこと』も見えやすくなるよ。",
+   years,
+   note:"年運だけで出来事は決まらないよ。大きな予定や契約は、現実の条件をいちばん大切にしてね。"
+  },
+  action_guide:actions,
+  balance_style:style,
   letter:{
    label:"LETTER",title:"TOWAからあなたへ",
    towa_line:dm==="癸"?"考えすぎる自分を、敵にしなくていい。あなたは、考えることで自分を守り、納得できる道を探してきた人だから。":"自分のペースで答えを作ることを、弱さだと思わなくていい。",
@@ -360,9 +445,9 @@ async function makeReading(req,res){
   const c=makeChart(p);
   await pool.query("INSERT INTO birth_profiles(user_id,gender,birth_date,birth_time,birth_time_known) VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id) DO UPDATE SET gender=EXCLUDED.gender,birth_date=EXCLUDED.birth_date,birth_time=EXCLUDED.birth_time,birth_time_known=EXCLUDED.birth_time_known,updated_at=NOW()",[u.id,p.gender,p.birth_date,p.birth_time_known?p.birth_time:null,Boolean(p.birth_time_known)]);
   await pool.query("INSERT INTO saju_profiles(user_id,engine_version,chart_json) VALUES($1,$2,$3) ON CONFLICT(user_id) DO UPDATE SET engine_version=EXCLUDED.engine_version,chart_json=EXCLUDED.chart_json,calculated_at=NOW()",[u.id,"@openfate/bazi-engine@2.0.0",JSON.stringify(c)]);
-  const r=reading(c,u.display_name);
-  await pool.query("INSERT INTO reading_reports(id,user_id,report_json,model_name) VALUES($1,$2,$3,$4)",[randomUUID(),u.id,JSON.stringify(r),"towa-rules-v0.11"]);
-  json(res,200,{chart:c,reading:r,engine:"towa-rules-v0.11",api_cost_jpy:0});
+  const r=reading(c,u.display_name),access=await accessFor(req,u.id);
+  await pool.query("INSERT INTO reading_reports(id,user_id,report_json,model_name) VALUES($1,$2,$3,$4)",[randomUUID(),u.id,JSON.stringify(r),"towa-rules-v0.14"]);
+  json(res,200,{chart:c,reading:publicReading(r,access),access,engine:"towa-rules-v0.14",api_cost_jpy:0});
  }catch(e){json(res,500,{error:e.message})}
 }
 async function guide(req,res){
@@ -371,8 +456,8 @@ async function guide(req,res){
  if(!sp)return json(res,400,{error:"先にTOWA MAPを作ってね。"});
  const allowed=["work","money","love","people","now"],k=allowed.includes(b.topic)?b.topic:"now";
  const access=await accessFor(req,u.id);
- if(!access.premium&&k!=="now")return json(res,402,{error:"このテーマは完全鑑定で読めるよ。",access});
- json(res,200,{topic:k,answer:guidance(sp.chart_json,k),access,engine:"towa-rules-v0.12",api_cost_jpy:0});
+ if(!access.premium)return json(res,402,{error:"もう少し深い話は、完全鑑定で一緒に見られるよ。",access});
+ json(res,200,{topic:k,answer:guidance(sp.chart_json,k),access,engine:"towa-rules-v0.14",api_cost_jpy:0});
 }
 function staticFile(req,res){
  let p=new URL(req.url,"http://x").pathname;if(p==="/")p="/index.html";
@@ -382,7 +467,7 @@ function staticFile(req,res){
 }
 const server=http.createServer(async(req,res)=>{
  const p=new URL(req.url,"http://x").pathname;
- if(req.method==="GET"&&p==="/api/health")return json(res,200,{ok:true,version:"0.12",database_ready:dbReady,database_error:dbError,interpretation_engine:"towa-rules-v0.12",openai_required:false,api_cost_jpy:0,target_year:TARGET_YEAR});
+ if(req.method==="GET"&&p==="/api/health")return json(res,200,{ok:true,version:"0.14",database_ready:dbReady,database_error:dbError,interpretation_engine:"towa-rules-v0.14",openai_required:false,api_cost_jpy:0,target_year:TARGET_YEAR});
  if(req.method==="GET"&&p==="/api/access"){const u=await requireUser(req,res);if(!u)return;return json(res,200,{access:await accessFor(req,u.id)});}
  if(req.method==="POST"&&p==="/api/auth/register")return dbReady?register(req,res):json(res,503,{error:"DB接続待ち"});
  if(req.method==="POST"&&p==="/api/auth/login")return dbReady?login(req,res):json(res,503,{error:"DB接続待ち"});
@@ -392,4 +477,4 @@ const server=http.createServer(async(req,res)=>{
  if(req.method==="GET")return staticFile(req,res);
  res.writeHead(405);res.end();
 });
-server.listen(PORT,()=>console.log("TOWA v0.12 listening on "+PORT+" dbReady="+dbReady+" rulesEngine=true apiCost=0 paywall=true"));
+server.listen(PORT,()=>console.log("TOWA v0.14 listening on "+PORT+" dbReady="+dbReady+" rulesEngine=true apiCost=0 paywall=true"));
