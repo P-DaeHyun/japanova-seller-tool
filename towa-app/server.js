@@ -434,7 +434,12 @@ async function me(req,res){
  const access=await accessFor(req,u.id);
  const bp=await one("SELECT gender,birth_date::text,birth_time::text,birth_time_known FROM birth_profiles WHERE user_id=$1",[u.id]);
  const sp=await one("SELECT chart_json FROM saju_profiles WHERE user_id=$1",[u.id]);
- const rr=await one("SELECT report_json,model_name,created_at FROM reading_reports WHERE user_id=$1 ORDER BY created_at DESC LIMIT 1",[u.id]);
+ let rr=await one("SELECT report_json,model_name,created_at FROM reading_reports WHERE user_id=$1 ORDER BY created_at DESC LIMIT 1",[u.id]);
+ if(sp?.chart_json&&(!rr||rr.model_name!=="towa-rules-v0.14")){
+  const refreshed=reading(sp.chart_json,u.display_name),createdAt=new Date().toISOString();
+  await pool.query("INSERT INTO reading_reports(id,user_id,report_json,model_name) VALUES($1,$2,$3,$4)",[randomUUID(),u.id,JSON.stringify(refreshed),"towa-rules-v0.14"]);
+  rr={report_json:refreshed,model_name:"towa-rules-v0.14",created_at:createdAt};
+ }
  json(res,200,{user:u,birth_profile:bp,chart:sp?.chart_json||null,access,latest_report:rr?{reading:publicReading(rr.report_json,access),engine:rr.model_name,created_at:rr.created_at}:null});
 }
 async function makeReading(req,res){
