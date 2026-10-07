@@ -12,6 +12,9 @@ const PORT=Number(process.env.PORT||3000);
 const DATABASE_URL=process.env.DATABASE_URL||"";
 const COOKIE_SECURE=process.env.COOKIE_SECURE==="true";
 const TARGET_YEAR=Number(process.env.TOWA_TARGET_YEAR||2027);
+const PRODUCT_CODE="towa_2027_complete";
+const TOWA_PRICE_JPY=Number(process.env.TOWA_PRICE_JPY||1480);
+const BETA_PREMIUM_PREVIEW=process.env.TOWA_BETA_PREMIUM_PREVIEW==="true";
 const publicDir=path.join(__dirname,"public");
 const schema=fs.readFileSync(path.join(__dirname,"schema.sql"),"utf8");
 const pool=DATABASE_URL?new Pool({connectionString:DATABASE_URL,ssl:process.env.PGSSLMODE==="disable"?false:{rejectUnauthorized:false},max:6}):null;
@@ -38,6 +41,16 @@ async function requireUser(req,res){
   const u=await currentUser(req);
   if(!u){json(res,401,{error:"ログインが必要だよ。"});return null}
   return u;
+}
+const previewPremium=req=>BETA_PREMIUM_PREVIEW&&new URL(req.url,"http://x").searchParams.get("preview")==="premium";
+async function accessFor(req,userId){
+  const ent=await one("SELECT status FROM entitlements WHERE user_id=$1 AND product_code=$2 AND status='active'",[userId,PRODUCT_CODE]);
+  const entitled=Boolean(ent),preview=previewPremium(req);
+  return {premium:entitled||preview,entitled,preview,product_code:PRODUCT_CODE,price_jpy:TOWA_PRICE_JPY,billing:"one_time",auto_renew:false,payment_ready:false};
+}
+function publicReading(r,access){
+  if(!r||access.premium)return r;
+  return {opening:r.opening,profile_cards:r.profile_cards,core:r.core,flow:r.flow,evidence:r.evidence};
 }
 function makeChart(p){
   const a=p.birth_date.split("-").map(Number);
@@ -333,10 +346,11 @@ async function login(req,res){
 }
 async function me(req,res){
  const u=await requireUser(req,res);if(!u)return;
+ const access=await accessFor(req,u.id);
  const bp=await one("SELECT gender,birth_date::text,birth_time::text,birth_time_known FROM birth_profiles WHERE user_id=$1",[u.id]);
  const sp=await one("SELECT chart_json FROM saju_profiles WHERE user_id=$1",[u.id]);
  const rr=await one("SELECT report_json,model_name,created_at FROM reading_reports WHERE user_id=$1 ORDER BY created_at DESC LIMIT 1",[u.id]);
- json(res,200,{user:u,birth_profile:bp,chart:sp?.chart_json||null,latest_report:rr?{reading:rr.report_json,engine:rr.model_name,created_at:rr.created_at}:null});
+ json(res,200,{user:u,birth_profile:bp,chart:sp?.chart_json||null,access,latest_report:rr?{reading:publicReading(rr.report_json,access),engine:rr.model_name,created_at:rr.created_at}:null});
 }
 async function makeReading(req,res){
  const u=await requireUser(req,res);if(!u)return;
@@ -356,7 +370,9 @@ async function guide(req,res){
  const b=await body(req),sp=await one("SELECT chart_json FROM saju_profiles WHERE user_id=$1",[u.id]);
  if(!sp)return json(res,400,{error:"先にTOWA MAPを作ってね。"});
  const allowed=["work","money","love","people","now"],k=allowed.includes(b.topic)?b.topic:"now";
- json(res,200,{topic:k,answer:guidance(sp.chart_json,k),engine:"towa-rules-v0.11",api_cost_jpy:0});
+ const access=await accessFor(req,u.id);
+ if(!access.premium&&k!=="now")return json(res,402,{error:"このテーマは完全鑑定で読めるよ。",access});
+ json(res,200,{topic:k,answer:guidance(sp.chart_json,k),access,engine:"towa-rules-v0.12",api_cost_jpy:0});
 }
 function staticFile(req,res){
  let p=new URL(req.url,"http://x").pathname;if(p==="/")p="/index.html";
@@ -366,7 +382,8 @@ function staticFile(req,res){
 }
 const server=http.createServer(async(req,res)=>{
  const p=new URL(req.url,"http://x").pathname;
- if(req.method==="GET"&&p==="/api/health")return json(res,200,{ok:true,version:"0.11",database_ready:dbReady,database_error:dbError,interpretation_engine:"towa-rules-v0.11",openai_required:false,api_cost_jpy:0,target_year:TARGET_YEAR});
+ if(req.method==="GET"&&p==="/api/health")return json(res,200,{ok:true,version:"0.12",database_ready:dbReady,database_error:dbError,interpretation_engine:"towa-rules-v0.12",openai_required:false,api_cost_jpy:0,target_year:TARGET_YEAR});
+ if(req.method==="GET"&&p==="/api/access"){const u=await requireUser(req,res);if(!u)return;return json(res,200,{access:await accessFor(req,u.id)});}
  if(req.method==="POST"&&p==="/api/auth/register")return dbReady?register(req,res):json(res,503,{error:"DB接続待ち"});
  if(req.method==="POST"&&p==="/api/auth/login")return dbReady?login(req,res):json(res,503,{error:"DB接続待ち"});
  if(req.method==="GET"&&p==="/api/me")return me(req,res);
@@ -375,4 +392,4 @@ const server=http.createServer(async(req,res)=>{
  if(req.method==="GET")return staticFile(req,res);
  res.writeHead(405);res.end();
 });
-server.listen(PORT,()=>console.log("TOWA v0.11 listening on "+PORT+" dbReady="+dbReady+" rulesEngine=true apiCost=0"));
+server.listen(PORT,()=>console.log("TOWA v0.12 listening on "+PORT+" dbReady="+dbReady+" rulesEngine=true apiCost=0 paywall=true"));
