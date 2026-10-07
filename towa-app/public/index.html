@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TOWA v0.11.7</title>
+<title>TOWA v0.11.8</title>
 <style>
 :root{--ink:#20212b;--navy:#292c4b;--paper:#fffdfa;--line:#e7ded3;--muted:#766f73;--gold:#b68035;--cream:#f7f1e8}
 *{box-sizing:border-box}
@@ -49,8 +49,8 @@ button{border:0;border-radius:14px;padding:13px 17px;background:var(--navy);colo
 .panel{min-height:270px;margin:17px 0;border-radius:24px;position:relative;overflow:hidden;background:#252743}
 .panelShade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(25,29,56,.08),rgba(25,29,56,.74) 54%,rgba(25,29,56,.95));z-index:1}
 .bubble{position:absolute;z-index:3;right:26px;top:50%;transform:translateY(-50%);width:52%;font:20px/1.7 Georgia,"Yu Mincho",serif;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.18)}
-.panel-core .art{filter:saturate(1.04) brightness(1.08)}
-.panel-core .panelShade{background:linear-gradient(90deg,rgba(25,29,56,.02),rgba(25,29,56,.64) 58%,rgba(25,29,56,.92))}
+.panel-core .art{filter:saturate(1.05) brightness(1.18) contrast(1.02)}
+.panel-core .panelShade{background:linear-gradient(90deg,rgba(25,29,56,.01),rgba(25,29,56,.50) 58%,rgba(25,29,56,.82))}
 .art-core{object-position:50% 24%}
 
 .abstract-flow{background:
@@ -71,9 +71,9 @@ linear-gradient(120deg,#222641,#2e334f 56%,#20243d)}
 .abstract-path:after{content:"";position:absolute;width:150px;height:150px;border:1px solid rgba(255,255,255,.07);border-radius:50%;left:92px;top:60px}
 .abstract-path .panelShade{background:linear-gradient(90deg,rgba(17,20,38,.24),rgba(27,31,55,.38) 45%,rgba(27,31,55,.82))}
 
-.panel-turning .art{filter:saturate(.92) brightness(.92)}
+.panel-turning .art{filter:saturate(.98) brightness(1.08) contrast(1.02)}
 .art-turning{object-position:78% 24%}
-.panel-turning .panelShade{background:linear-gradient(90deg,rgba(25,29,56,.94) 0%,rgba(25,29,56,.72) 43%,rgba(25,29,56,.18) 100%)}
+.panel-turning .panelShade{background:linear-gradient(90deg,rgba(25,29,56,.86) 0%,rgba(25,29,56,.60) 43%,rgba(25,29,56,.10) 100%)}
 .panel-turning .bubble{left:30px;right:auto;width:48%}
 
 .panel-next .art{filter:saturate(1.06) brightness(1.16)}
@@ -121,7 +121,7 @@ pre{white-space:pre-wrap;font-size:12px}
 .art{object-position:center top}
 .panel-turning .art,.panel-next .art{object-position:center top}
 .bubble,.panel-turning .bubble,.panel-next .bubble{left:22px;right:22px;top:auto;bottom:24px;transform:none;width:auto}
-.panel-turning .panelShade{background:linear-gradient(180deg,rgba(25,29,56,.05),rgba(25,29,56,.78) 55%,rgba(25,29,56,.98))}
+.panel-turning .panelShade{background:linear-gradient(180deg,rgba(25,29,56,.03),rgba(25,29,56,.66) 55%,rgba(25,29,56,.92))}
 .panel-next .panelShade{background:linear-gradient(180deg,rgba(25,29,56,.02),rgba(25,29,56,.50) 54%,rgba(25,29,56,.82))}
 .ttl{font-size:25px}
 .prose,.topicBlock{padding:18px}
@@ -133,13 +133,13 @@ pre{white-space:pre-wrap;font-size:12px}
 <section class="card hero">
   <div class="copy">
     <div class="logo">T☾WA<small>データで読み解く四柱推命</small></div>
-    <span class="beta">v0.11.7 · TOWA MAP</span>
+    <span class="beta">v0.11.8 · TOWA MAP</span>
     <h1>あなたという人の<br>地図をひらく。</h1>
     <p class="muted">生まれた日の暦を計算し、変わりにくいあなたの核と、今動いている流れを重ねて読む。未来を決めつけるためじゃなく、自分の選び方を知るための四柱推命だよ。</p>
     <div id="infra" class="status">接続状態を確認中…</div>
   </div>
   <div class="visual">
-    <img class="art heroArt" src="/assets/towa-warm.webp?v=0117" alt="TOWA">
+    <img class="art heroArt" src="/assets/towa-warm.webp?v=0118" alt="TOWA">
     <div class="heroShade"></div>
     <div class="heroPill">ずっと、あなたを知っていく。</div>
   </div>
@@ -174,13 +174,13 @@ pre{white-space:pre-wrap;font-size:12px}
 
 <script>
 const TOWA_ART={
-  hero:"/assets/towa-warm.webp?v=0117",
-  core:"/assets/towa-calm.webp?v=0117",
+  hero:"/assets/towa-warm.webp?v=0118",
+  core:"/assets/towa-calm.webp?v=0118",
   flow:null,
   path:null,
-  turning:"/assets/towa-calm.webp?v=0117",
-  next:"/assets/towa-warm.webp?v=0117",
-  letter:"/assets/towa-warm.webp?v=0117"
+  turning:"/assets/towa-calm.webp?v=0118",
+  next:"/assets/towa-warm.webp?v=0118",
+  letter:"/assets/towa-warm.webp?v=0118"
 };
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
