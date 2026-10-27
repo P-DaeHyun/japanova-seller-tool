@@ -1,11 +1,13 @@
 {
-  "fxVersion": "2026.10.26",
-  "updatedAt": "2026-10-26T13:50:49+09:00",
-  "lastAttemptAt": "2026-10-26T13:50:49+09:00",
+  "fxVersion": "2026.10.27",
+  "updatedAt": "2026-10-27T14:09:26+09:00",
+  "lastAttemptAt": "2026-10-27T14:09:26+09:00",
   "source": "Frankfurter v2 via GitHub Actions",
-  "sourceDate": "2026-10-26",
-  "status": "ok",
-  "warnings": [],
+  "sourceDate": "2026-10-27",
+  "status": "warning",
+  "warnings": [
+    "BRL: 두 환율 소스 차이 4.04%"
+  ],
   "providers": {
     "primary": "Frankfurter v2",
     "fallback": "ExchangeRate-API Open",
@@ -13,12 +15,12 @@
   },
   "fxBufferDefault": 0.02,
   "jpyPer": {
-    "TWD": 4.821600771456123,
-    "SGD": 122.90447863920161,
-    "MYR": 38.45562221196739,
-    "THB": 4.655710228595372,
-    "PHP": 2.471149331554106,
-    "VND": 0.006085686465433301,
-    "BRL": 31.19248884868524
+    "TWD": 4.829051574270814,
+    "SGD": 122.89994715302272,
+    "MYR": 38.48522167487685,
+    "THB": 4.6546266989387455,
+    "PHP": 2.4632968765395606,
+    "VND": 0.006091246878235975,
+    "BRL": 30.140454518054135
   }
 }
